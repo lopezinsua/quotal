@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quotal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="card" class="card source-none loading">
+      <!-- Píldora compacta (modo colapsado). Click para fijar abierto.
+           Aloja los TRES indicadores; el estilo activo (clase pill--bar /
+           pill--ring / pill--minimal en #pill) muestra el suyo y oculta el resto.
+           El número (#pill-pct) es común a todos. -->
+      <div id="pill" class="pill pill--bar hidden" data-i18n-title="title_pill">
+        <!-- minimal: punto de estado -->
+        <span class="pill-dot" aria-hidden="true"></span>
+        <!-- ring: mini-gauge que replica el logo y se llena con el % de sesión -->
+        <svg id="pill-gauge" class="pill-gauge" viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="pg-track" cx="18" cy="18" r="15" />
+          <circle id="pill-gauge-arc" class="pg-arc" cx="18" cy="18" r="15" />
+        </svg>
+        <!-- número de sesión (común a los tres estilos) -->
+        <span id="pill-pct">—</span>
+        <!-- bar: barra lineal de progreso -->
+        <span class="pill-bar" aria-hidden="true">
+          <span id="pill-bar-fill" class="pill-bar-fill"></span>
+        </span>
+      </div>
+
+      <!-- Vista completa -->
+      <div id="full">
+        <header class="bar" id="header-bar">
+          <span class="title">Quotal</span>
+          <div class="actions">
+            <button id="refresh-btn" class="icon-btn" data-i18n-title="t_refresh"><span class="ico">&#8635;</span></button>
+            <button id="pin-btn" class="icon-btn" data-i18n-title="t_pin">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none"
+                   stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="16" x2="12" y2="22"></line>
+                <path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path>
+              </svg>
+            </button>
+            <button id="settings-btn" class="icon-btn" data-i18n-title="t_settings">&#9881;</button>
+            <button id="hide-btn" class="icon-btn" data-i18n-title="t_hide">&#x2715;</button>
+          </div>
+        </header>
+
+        <section id="metrics-view" class="body">
+          <!-- Cabecera del plan -->
+          <div class="plan-head">
+            <span id="plan-name" class="plan-name">Pro</span>
+            <span class="plan-sub" data-i18n="plan_limits">Plan usage limits</span>
+          </div>
+
+          <!-- Sesión actual (ventana de uso principal) -->
+          <div id="session-block" class="usage-block">
+            <div class="usage-row">
+              <span class="usage-name" data-i18n="session">Current session</span>
+              <span id="session-pct" class="usage-pct">—</span>
+            </div>
+            <div class="progress-track">
+              <div id="session-fill" class="progress-fill session"></div>
+            </div>
+            <div class="usage-foot">
+              <span id="session-reset" class="usage-reset">—</span>
+              <!-- Sparkline del % de sesión (tendencia reciente): área degradada +
+                   línea. Sin datos suficientes queda oculto por la clase `.empty`. -->
+              <svg id="session-spark" class="sparkline empty" viewBox="0 0 100 24"
+                   preserveAspectRatio="none" aria-hidden="true" data-i18n-title="t_spark">
+                <defs>
+                  <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.32" />
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon id="session-spark-area" fill="url(#spark-grad)" points="" />
+                <polyline id="session-spark-poly" fill="none" stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round"
+                          stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Límite semanal -->
+          <div id="weekly-block" class="usage-block">
+            <div class="usage-row">
+              <span class="usage-name" data-i18n="weekly">Weekly · all models</span>
+              <span id="weekly-pct" class="usage-pct">—</span>
+            </div>
+            <div class="progress-track">
+              <div id="weekly-fill" class="progress-fill weekly"></div>
+            </div>
+            <div class="usage-foot">
+              <span id="weekly-reset" class="usage-reset">—</span>
+            </div>
+          </div>
+
+          <!-- Contexto (secundario, opcional) -->
+          <div id="context-line" class="context-line">
+            <span id="source-dot" class="dot"></span>
+            <span id="context-label" class="context-label" data-i18n="context">Context</span>
+            <span id="context-pct" class="context-pct">—</span>
+          </div>
+
+          <p id="freshness" class="freshness">—</p>
+
+          <!-- Aviso de DERIVA DE ESQUEMA: aparece solo si el backend detecta que
+               algún formato de Claude Code (credenciales, statusLine, /usage) dejó
+               de tener los campos esperados → quizá haya que actualizar Quotal. -->
+          <p id="schema-warn" class="schema-warn hidden"></p>
+        </section>
+
+        <section id="settings-view" class="body settings hidden">
+          <h2 class="settings-title" data-i18n="settings_title">Settings</h2>
+          <label class="setting-row">
+            <span data-i18n="language">Language</span>
+            <select id="opt-lang" class="lang-select"></select>
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_translucent">Translucent mode</span>
+            <input type="checkbox" id="opt-translucent" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_ontop">Always on top</span>
+            <input type="checkbox" id="opt-on-top" checked />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_pill">Pill mode (compact)</span>
+            <input type="checkbox" id="opt-collapsed" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_pill_style">Pill style</span>
+            <select id="opt-pill-style" class="lang-select">
+              <option value="bar" data-i18n="pill_bar">Bar</option>
+              <option value="ring" data-i18n="pill_ring">Ring</option>
+              <option value="minimal" data-i18n="pill_minimal">Minimal</option>
+            </select>
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_border_glow">Light up border by usage</span>
+            <input type="checkbox" id="opt-border-glow" checked />
+          </label>
+          <div class="setting-col">
+            <span data-i18n="border_colors">Window border colors</span>
+            <div class="border-colors">
+              <label class="border-swatch">
+                <input type="color" id="opt-border-normal" />
+                <span data-i18n="border_normal">Normal</span>
+              </label>
+              <label class="border-swatch">
+                <input type="color" id="opt-border-warn" />
+                <span data-i18n="border_warn">Warning</span>
+              </label>
+              <label class="border-swatch">
+                <input type="color" id="opt-border-crit" />
+                <span data-i18n="border_crit">Critical</span>
+              </label>
+            </div>
+            <button id="border-reset" class="border-reset" data-i18n="border_reset">Reset to defaults</button>
+          </div>
+          <label class="setting-row">
+            <span data-i18n="opt_tray_static">Fixed tray color</span>
+            <input type="checkbox" id="opt-tray-static" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_show_context">Show context window</span>
+            <input type="checkbox" id="opt-show-context" checked />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_remember_pos">Remember last position</span>
+            <input type="checkbox" id="opt-remember-pos" checked />
+          </label>
+          <div class="setting-col">
+            <span><span data-i18n="pos_label">Screen position</span> <em class="hint" data-i18n="pos_hint">(click to move)</em></span>
+            <div id="position-grid" class="pos-grid">
+              <button class="pos-cell" data-h="left" data-v="top" data-i18n-title="pos_tl"></button>
+              <button class="pos-cell" data-h="center" data-v="top" data-i18n-title="pos_tc"></button>
+              <button class="pos-cell" data-h="right" data-v="top" data-i18n-title="pos_tr"></button>
+              <button class="pos-cell" data-h="left" data-v="middle" data-i18n-title="pos_ml"></button>
+              <button class="pos-cell" data-h="center" data-v="middle" data-i18n-title="pos_mc"></button>
+              <button class="pos-cell" data-h="right" data-v="middle" data-i18n-title="pos_mr"></button>
+              <button class="pos-cell" data-h="left" data-v="bottom" data-i18n-title="pos_bl"></button>
+              <button class="pos-cell" data-h="center" data-v="bottom" data-i18n-title="pos_bc"></button>
+              <button class="pos-cell" data-h="right" data-v="bottom" data-i18n-title="pos_br"></button>
+            </div>
+          </div>
+          <label class="setting-row">
+            <span data-i18n="opt_autostart">Open with Claude Code</span>
+            <input type="checkbox" id="opt-autostart" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_close">Close with Claude Code</span>
+            <input type="checkbox" id="opt-close" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_statusline">Official context (statusLine)</span>
+            <input type="checkbox" id="opt-statusline" />
+          </label>
+          <p class="settings-note" data-i18n="note"></p>
+          <button id="settings-close" class="settings-back" data-i18n="back">Back</button>
+        </section>
+      </div>
+
+      <!-- Tirador de redimensionado (esquina inferior derecha de la VENTANA, no
+           del contenido: por eso es hermano de #full y no se escala con él).
+           Arrastrarlo agranda/reduce todo el widget de forma proporcional,
+           reescalando también el texto (zoom nítido) para más personalización. -->
+      <div id="resize-grip" data-i18n-title="t_resize" title="Resize">
+        <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+          <path d="M11 5 5 11M11 9 9 11" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round" fill="none" />
+        </svg>
+      </div>
+    </main>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

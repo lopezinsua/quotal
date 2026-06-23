@@ -1,0 +1,21 @@
+{
+  "name": "quotal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Quotal — widget de escritorio multiplataforma que muestra el uso de Claude (contexto + límites de plan).",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@tauri-apps/cli": "^2",
+    "eslint": "^9",
+    "globals": "^15",
+    "jsdom": "^25",
+    "vitest": "^2"
+  }
+}

@@ -1,0 +1,811 @@
+/* styles.css — UI minimalista
+ *
+ * Sistema de diseño inspirado en chrome oscuro tipo Raycast/Linear:
+ * escalera de superficies casi-negras, bordes "hairline", tipografía con
+ * tracking suave y números tabulares, acentos saturados solo donde aportan.
+ *(o eso intentaré lol) 
+ */
+
+:root {
+  /* Superficies (escalera oscura) */
+  --bg-top: #16161a;
+  --bg-bot: #0e0e11;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+
+  /* Texto */
+  --fg: #f4f4f6;
+  --body: #cdcdce;
+  --muted: #8e8e93;
+  --faint: #6a6b6f;
+
+  /* Bordes hairline */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* Pistas y acentos */
+  --track: rgba(255, 255, 255, 0.07);
+  --green: #59d499;
+  --indigo: #8b95f6;
+  --amber: #ffc533;
+  --red: #ff6161;
+  --accent: var(--faint);
+
+  /* Colores de ESTADO semánticos (no se hardcodean en los componentes: estos
+     tokens son la única fuente de verdad del color por severidad). */
+  --state-ok: var(--green);
+  --state-warn: var(--amber);
+  --state-crit: var(--red);
+  --state-neutral: var(--faint);
+  /* Estado vigente del widget; lo conmutan las clases .sev-* / .source-none.
+     De él cuelgan la píldora, el sparkline y el delta. */
+  --state: var(--state-ok);
+
+  /* Colores del BORDE de la ventana por estado. Son la única fuente de verdad
+     del color del marco; el usuario los puede sobreescribir desde Ajustes
+     (controls.js inyecta estas variables en :root). El normal es un hairline
+     translúcido; warn/crit son los anillos de alerta. */
+  --border-normal: var(--line);
+  --border-warn: rgba(255, 197, 51, 0.55);
+  --border-crit: rgba(255, 97, 97, 0.7);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html,
+body {
+  background: transparent;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Inter, -apple-system,
+    system-ui, sans-serif;
+  font-feature-settings: "calt", "kern", "ss03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color: var(--fg);
+  overflow: hidden;
+}
+
+.card {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  /* Gradiente sutil para dar profundidad sin sombra (la ventana es del tamaño
+     exacto de la tarjeta, una sombra exterior se recortaría). */
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 100%);
+  border-radius: 14px;
+  border: 1px solid var(--border-normal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* `border-radius` se anima para el morph píldora↔completo (14px↔999px). */
+  transition: opacity 0.25s ease, box-shadow 0.3s ease, border-radius 0.21s ease;
+}
+
+/* Modo translúcido: deja ver el escritorio. */
+.card.translucent {
+  background: linear-gradient(
+    180deg,
+    rgba(22, 22, 26, 0.66) 0%,
+    rgba(14, 14, 17, 0.66) 100%
+  );
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* Acento por fuente activa (punto de estado del contexto). */
+.card.source-hook { --accent: var(--green); }
+.card.source-logs { --accent: var(--amber); }
+.card.source-sync { --accent: #57c1ff; }
+.card.source-none { --accent: var(--faint); --state: var(--state-neutral); }
+
+.card.stale {
+  opacity: 0.5;
+}
+
+/* Aviso por severidad de uso del plan.
+ *
+ * El anillo de alerta se dibuja con `box-shadow: inset`, NO con `border-color`.
+ * Motivo: la ventana es transparente, sin marco y del tamaño exacto de la
+ * tarjeta, así que el píxel del borde exterior queda en el mismo canto de la
+ * ventana el compositor de Windows lo recorta y, con las esquinas
+ * redondeadas, el borde se ve fino/irregular o desaparece a trozos. Un
+ * box-shadow interior se pinta dentro del radio y siempre se ve completo.
+ * Además animamos el box-shadow (no border-color) para no chocar con la
+ * `transition: border-color` de `.card`, que provocaba un parpadeo al
+ * entrar/salir del estado. */
+.card.sev-warning {
+  --state: var(--state-warn);
+  box-shadow: inset 0 0 0 1.5px var(--border-warn);
+}
+.card.sev-critical {
+  --state: var(--state-crit);
+  box-shadow: inset 0 0 0 1.5px var(--border-crit);
+  animation: sev-pulse 2.4s ease-in-out infinite;
+}
+/* El pulso deriva sus opacidades del color crítico vigente (color-mix), así un
+   color personalizado late igual que el rojo por defecto. */
+@keyframes sev-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--border-crit) 64%, transparent);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px var(--border-crit),
+                inset 0 0 12px color-mix(in srgb, var(--border-crit) 26%, transparent);
+  }
+}
+
+/* Opción "no iluminar el borde de la ventana": apaga el anillo de aviso/crítico y
+   su pulso. El color de estado (--state) lo siguen heredando la píldora, el
+   sparkline y el delta, así que solo se apaga el MARCO. */
+.card.no-glow.sev-warning,
+.card.no-glow.sev-critical {
+  box-shadow: none;
+  animation: none;
+}
+
+/* Giro fluido del icono de refresco (solo el glifo). */
+.icon-btn .ico {
+  display: inline-block;
+  line-height: 1;
+}
+.icon-btn.spinning .ico {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Estructura ---- */
+/* El contenido vive en un lienzo de tamaño BASE fijo (248×268). El escalado NO se
+ * hace en CSS: se aplica el ZOOM NATIVO del webview (`webview.setZoom`, en
+ * window.js), que re-renderiza TODA la página (texto incluido) nítida y de forma
+ * fiable en todas las plataformas. La ventana mantiene la proporción BASE, así el
+ * lienzo encaja exacto sin huecos ni recortes a cualquier tamaño. */
+#full {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 248px;
+  height: 268px;
+  display: flex;
+  flex-direction: column;
+}
+.hidden {
+  display: none !important;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px 7px 12px;
+  cursor: grab;
+}
+.bar:active {
+  cursor: grabbing;
+}
+.title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.actions {
+  display: flex;
+  gap: 1px;
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 6px;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.icon-btn:hover {
+  color: var(--fg);
+  background: var(--surface-hover);
+}
+.icon-btn svg {
+  display: block;
+}
+/* Pin fijado: relleno sólido de la cabeza; suelto: solo contorno. */
+#pin-btn.pinned {
+  color: var(--fg);
+}
+#pin-btn.pinned svg path {
+  fill: currentColor;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 3px 13px 12px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* ---- Cabecera del plan ---- */
+.plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.plan-name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.plan-sub {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+
+/* ---- Ventanas de uso (sesión / semanal) ---- */
+.usage-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.usage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.usage-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--body);
+  letter-spacing: 0.01em;
+  /* La etiqueta puede ser larga (p. ej. "Semanal; todos los modelos"): que se
+     encoja y, si no cabe, se recorte con elipsis pero NUNCA empuje al % a otra
+     línea, para que "93% usado" y "60% usado" queden siempre alineados. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.usage-pct {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  flex: none;
+  white-space: nowrap;
+}
+/* Pulso de color al cambiar el valor: del color de estado de vuelta al normal.
+   Sutil, una sola vez, sin loops que distraigan. */
+.usage-pct.flash {
+  animation: val-flash 0.7s ease;
+}
+@keyframes val-flash {
+  0% { color: var(--state); }
+  100% { color: var(--fg); }
+}
+
+/* Sparkline del % de sesión: línea + área degradada, hereda el color de estado.
+   Un filo de luz (drop-shadow muy tenue) le da relieve sobre la superficie. */
+.sparkline {
+  width: 82px;
+  height: 20px;
+  align-self: center;
+  color: var(--state);
+  opacity: 0.92;
+  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--state) 28%, transparent));
+  transition: color 0.3s ease, opacity 0.25s ease;
+}
+.sparkline.empty {
+  opacity: 0;
+}
+.usage-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.usage-tok {
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: var(--track);
+  border-radius: 999px;
+  overflow: hidden;
+  /* Hundido sutil para que la barra de relleno "descanse" dentro de la pista. */
+  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.28);
+}
+
+/* ---- Estado de carga (antes del primer dato): esqueleto con shimmer ----
+   Minimalista: solo una pasada de luz sobre las pistas vacías. Se retira en
+   cuanto llega un payload (render quita la clase `.loading`). */
+.card.loading .progress-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to { transform: translateX(100%); }
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  /* Filo de luz superior + halo del color de relleno: relieve sin recargar. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
+              0 0 8px color-mix(in srgb, currentColor 0%, transparent);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+}
+.progress-fill.session {
+  background: var(--state-ok);
+}
+.progress-fill.weekly {
+  background: var(--indigo);
+}
+.progress-fill.warn {
+  background: var(--state-warn);
+}
+.progress-fill.crit {
+  background: var(--state-crit);
+}
+
+/* ---- Línea de contexto (secundaria) ---- */
+.context-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+  font-size: 11px;
+}
+.context-label {
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.context-pct {
+  margin-left: auto;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--body);
+}
+
+.freshness {
+  font-size: 9px;
+  color: var(--faint);
+  text-align: right;
+  margin-top: auto;
+  letter-spacing: 0.02em;
+  /* Deja sitio al tirador de redimensionado de la esquina inferior derecha. */
+  padding-right: 12px;
+}
+/* Dato no en vivo (offline / sin conexión): se tiñe de ámbar como aviso sutil. */
+.freshness.offline {
+  color: var(--amber);
+}
+
+/* Aviso de deriva de esquema: discreto pero visible (ámbar), solo si el backend
+   detecta que un formato de Claude Code dejó de reconocerse. */
+.schema-warn {
+  font-size: 9px;
+  color: var(--amber);
+  text-align: right;
+  letter-spacing: 0.02em;
+  padding-right: 12px;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* ---- Tirador de redimensionado (esquina inferior derecha) ----
+ * La ventana es sin marco: el borde inferior/derecho para arrastrar es una
+ * franja invisible imposible de agarrar. Este agarre visible se sitúa sobre la
+ * esquina y dispara el resize nativo hacia el sureste. */
+#resize-grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  color: var(--faint);
+  cursor: nwse-resize;
+  opacity: 0.55;
+  transition: opacity 0.12s ease, color 0.12s ease;
+  -webkit-user-select: none;
+  user-select: none;
+  z-index: 5;
+}
+#resize-grip:hover {
+  opacity: 1;
+  color: var(--body);
+}
+#resize-grip svg {
+  display: block;
+}
+
+/* ---- Píldora colapsada ---- */
+/* En modo píldora la tarjeta se redondea por completo (forma de píldora real). */
+.card.is-pill {
+  border-radius: 999px;
+}
+
+/* Morph píldora<->completo: la VENTANA crece/encoge suavemente (bucle nativo) y
+   aquí acompañamos con un CROSSFADE del contenido (#pill<->#full) y el redondeo del
+   borde (la transición de `border-radius` de `.card` lo anima 14px<->999px). Así no
+   se ve el desajuste de proporción entre la pastilla y la tarjeta: el cambio fluye
+   en vez de "saltar". */
+.card.morphing #full,
+.card.morphing #pill {
+  transition: opacity 150ms ease;
+}
+
+/* Contenedor común a los tres estilos. El #pill lleva una clase de variante
+   (pill--bar / pill--ring / pill--minimal) que decide qué indicador se ve; el
+   número (#pill-pct) es compartido. Cada variante ajusta gap/padding para
+   centrarse con holgura en su tamaño de ventana propio. */
+.pill {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#pill-pct {
+  font-weight: 650;
+  color: var(--fg);
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Por defecto todos los indicadores ocultos; cada variante muestra el suyo. */
+.pill-dot,
+.pill-gauge,
+.pill-bar {
+  display: none;
+}
+
+/* — Variante BAR: número + barra lineal de progreso — */
+.pill--bar {
+  gap: 7px;
+  padding: 0 10px;
+}
+.pill--bar #pill-pct {
+  font-size: 11px;
+  flex: none;
+}
+.pill--bar .pill-bar {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  background: var(--track);
+  border-radius: 999px;
+  overflow: hidden;
+  /* Hundido sutil, como la pista de la vista completa. */
+  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.28);
+}
+.pill-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--state);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+}
+
+/* — Variante RING: mini gauge (réplica del logo) + número — */
+.pill--ring {
+  gap: 6px;
+  padding: 0 9px;
+}
+.pill--ring #pill-pct {
+  font-size: 11px;
+  flex: none; /* nunca encoger el número: el "%" se recortaba con 3 dígitos */
+}
+.pill--ring .pill-gauge {
+  display: block;
+}
+/* Mini-gauge: se llena con el % de sesión. Hereda el color de estado vía
+   `--state`. Rotado −90° para que el arco arranque arriba. Tamaño legible para
+   que el RELLENO se perciba (antes, a 14px y con la pista casi invisible, parecía
+   un logo estático sin moverse). */
+.pill-gauge {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  transform: rotate(-90deg);
+}
+.pg-track {
+  fill: none;
+  /* Pista bien visible (no la translúcida 0.07 de la vista completa): así el
+     anillo se lee como un medidor incluso con poco relleno. */
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 4.5;
+}
+.pg-arc {
+  fill: none;
+  stroke: var(--state);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0 94.25;
+  /* Halo tenue del color de estado para que el arco "salte" sobre la pista. */
+  filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--state) 45%, transparent));
+  transition: stroke-dasharray 0.5s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+}
+
+/* Variante MINIMAL: punto de estado + número */
+.pill--minimal {
+  gap: 6px;
+  padding: 0 10px;
+}
+.pill--minimal #pill-pct {
+  font-size: 11.5px;
+}
+.pill--minimal .pill-dot {
+  display: block;
+}
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--state);
+  /* Halo tenue del color de estado, igual que el punto de la fuente activa. */
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--state) 18%, transparent);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ---- Configuración ---- */
+#settings-view {
+  overflow-y: auto;
+  gap: 9px;
+}
+#settings-view::-webkit-scrollbar {
+  width: 6px;
+}
+#settings-view::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
+.settings-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--body);
+  cursor: pointer;
+}
+.setting-row input {
+  cursor: pointer;
+  accent-color: var(--green);
+}
+.num-input {
+  width: 56px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 11px;
+  text-align: right;
+  padding: 2px 6px;
+}
+.num-input.text {
+  width: 80px;
+  text-align: left;
+}
+.lang-select {
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 3px 6px;
+  cursor: pointer;
+  max-width: 130px;
+}
+.lang-select:hover {
+  background: var(--surface-hover);
+}
+.lang-select option {
+  background: #16161a;
+  color: var(--fg);
+}
+
+/* ---- Selector de posición (mini-pantalla con 9 anclajes) ---- */
+.setting-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--body);
+}
+.setting-col .hint {
+  color: var(--faint);
+  font-style: normal;
+  font-size: 10px;
+}
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 3px;
+  width: 148px;
+  height: 92px;
+  align-self: center;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px;
+}
+.pos-cell {
+  border: none;
+  border-radius: 5px;
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.12s ease;
+}
+.pos-cell::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.4;
+  transition: background 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
+}
+.pos-cell:hover {
+  background: var(--surface-hover);
+}
+.pos-cell:hover::after {
+  background: var(--green);
+  opacity: 1;
+  transform: scale(1.15);
+}
+.pos-cell.active {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+}
+.pos-cell.active::after {
+  background: var(--green);
+  opacity: 1;
+}
+
+/* ---- Selectores de color del borde (3 estados) ---- */
+.border-colors {
+  display: flex;
+  gap: 8px;
+}
+.border-swatch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+/* Quitamos el chrome nativo del input para que el swatch encaje con el resto:
+   borde hairline, esquinas redondeadas y una muestra a sangre dentro. */
+.border-swatch input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.border-swatch input[type="color"]:hover {
+  border-color: var(--line-strong);
+}
+.border-swatch input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.border-swatch input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.border-reset {
+  align-self: flex-start;
+  background: var(--surface);
+  color: var(--body);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.border-reset:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+
+.settings-note {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.settings-note code {
+  background: var(--surface-hover);
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 9px;
+}
+.settings-back {
+  margin-top: auto;
+  align-self: flex-start;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.settings-back:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}

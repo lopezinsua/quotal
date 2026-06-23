@@ -1,0 +1,3 @@
+# Mantiene el estilo compacto del proyecto (one-liners) para minimizar el churn
+# al introducir la puerta `cargo fmt --check` en CI.
+use_small_heuristics = "Max"
