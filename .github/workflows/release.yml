@@ -1,0 +1,140 @@
+# Compila el widget para Windows, macOS y Linux AUTOMÁTICAMENTE.
+#
+# Cada entrada de la matriz corre en su propio SO (GitHub lo provee), así que
+# "detecta el SO" sin lógica nuestra: cada runner produce el instalador nativo
+# de su plataforma y lo adjunta a una Release de GitHub.
+#   - Windows → .msi y .exe (NSIS)
+#   - macOS   → .dmg (binario universal: Apple Silicon + Intel)
+#   - Linux   → .AppImage y .deb
+#
+# Se dispara al publicar un tag `vX.Y.Z` o manualmente (workflow_dispatch).
+#
+# ───────────────────────────────────────────────────────────────────────────
+# FIRMA DE BINARIOS (opcional pero MUY recomendada)
+#
+# Sin firmar, el usuario final verá: SmartScreen (Windows), Gatekeeper bloqueando
+# la app (macOS) y, a veces, falsos positivos de antivirus. La firma es 100%
+# opcional aquí: si NO defines los secrets de abajo, el release se construye igual
+# pero SIN firmar (comportamiento actual). En cuanto los añadas, firma solo.
+#
+# Windows (Authenticode) — Settings → Secrets and variables → Actions:
+#   - WINDOWS_CERTIFICATE           PFX del certificado, en base64
+#                                   (`base64 -w0 cert.pfx` / `[Convert]::ToBase64String(...)`).
+#   - WINDOWS_CERTIFICATE_PASSWORD  Contraseña del PFX.
+#   Certificado: OV o EV de una CA (DigiCert, Sectigo…). NOTA: con OV, SmartScreen
+#   aún pide "reputación" hasta acumular descargas; EV la concede de inmediato pero
+#   suele requerir token HSM (no exportable a PFX → este flujo no aplica a EV-HSM).
+#
+# macOS (Developer ID + notarización) — los lee tauri-action de forma nativa:
+#   - APPLE_CERTIFICATE             .p12 "Developer ID Application" en base64.
+#   - APPLE_CERTIFICATE_PASSWORD    Contraseña del .p12.
+#   - APPLE_SIGNING_IDENTITY        p. ej. "Developer ID Application: Nombre (TEAMID)".
+#   - APPLE_ID                      Apple ID (correo) de la cuenta de desarrollador.
+#   - APPLE_PASSWORD               Contraseña ESPECÍFICA de app (appleid.apple.com).
+#   - APPLE_TEAM_ID                ID del equipo (10 caracteres).
+#   La notarización ocurre automáticamente si APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID
+#   están presentes. Requiere cuenta del Apple Developer Program ($99/año).
+# ───────────────────────────────────────────────────────────────────────────
+
+name: build-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest # binario universal (arm64 + x86_64)
+            args: "--target universal-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    # Mapea los secrets a env del job para poder consultarlos en `if:` (el contexto
+    # `secrets` no está disponible en condiciones; `env` sí). Vacío si no existen.
+    env:
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Dependencias nativas de WebKitGTK + bandeja del sistema (solo Linux).
+      - name: Instalar dependencias de Linux
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libayatana-appindicator3-dev
+
+      - name: Configurar Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Caché de compilación de Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias del proyecto
+        run: npm install
+
+      # Firma de Windows: SOLO si hay certificado en secrets. Importa el PFX al
+      # almacén del usuario, lee su huella (thumbprint) y la inyecta en
+      # tauri.conf.json → el bundler firma el .exe/.msi con Authenticode + sello de
+      # tiempo. Sin el secret, este paso se salta y el build sale sin firmar.
+      - name: Configurar firma de Windows (si hay certificado)
+        if: matrix.platform == 'windows-latest' && env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [IO.File]::WriteAllBytes("$PWD\cert.pfx", $bytes)
+          $sec = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath "$PWD\cert.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $sec
+          Remove-Item "$PWD\cert.pfx" -Force
+          $conf = "src-tauri/tauri.conf.json"
+          $json = Get-Content $conf -Raw | ConvertFrom-Json
+          if (-not $json.bundle.PSObject.Properties.Match('windows').Count) {
+            $json.bundle | Add-Member -Name windows -Value ([pscustomobject]@{}) -MemberType NoteProperty
+          }
+          $json.bundle.windows | Add-Member -Name certificateThumbprint -Value $cert.Thumbprint -MemberType NoteProperty -Force
+          $json.bundle.windows | Add-Member -Name digestAlgorithm -Value "sha256" -MemberType NoteProperty -Force
+          $json.bundle.windows | Add-Member -Name timestampUrl -Value "http://timestamp.digicert.com" -MemberType NoteProperty -Force
+          $json | ConvertTo-Json -Depth 32 | Set-Content $conf -Encoding utf8
+          Write-Host "Firma de Windows configurada con la huella $($cert.Thumbprint)"
+
+      - name: Compilar y publicar Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma + notarización de macOS (no-op si los secrets no están definidos).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.0.0-{0}', github.run_number) }}
+          releaseName: "Quotal ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

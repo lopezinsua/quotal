@@ -1,0 +1,102 @@
+# CI de calidad: formato, lint y tests del backend Rust en cada push y PR.
+#
+# Corre solo en Linux (es donde compila más rápido y basta para validar el código
+# multiplataforma: la lógica es la misma). El job de release (release.yml) ya cubre
+# la compilación nativa de los tres SO al publicar un tag.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela ejecuciones antiguas del mismo ref si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Lint del frontend (JS). Su motivo principal es `no-undef`: un refactor dejó un
+  # `BASE_H` sin importar que rompía el layout en runtime sin que el CI (solo Rust)
+  # lo viera. Este job lo convierte en un fallo de build.
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Tests (vitest)
+        run: npm test
+
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Dependencias nativas que necesita el crate de Tauri para compilar/enlazar.
+      - name: Instalar dependencias de Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            libayatana-appindicator3-dev
+
+      - name: Configurar Rust (con rustfmt y clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Caché de compilación de Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Formato (cargo fmt --check)
+        working-directory: ./src-tauri
+        run: cargo fmt --all --check
+
+      - name: Lint (cargo clippy)
+        working-directory: ./src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests (cargo test)
+        working-directory: ./src-tauri
+        run: cargo test --all
+
+  # Compila en Windows y macOS para que el código tras `#[cfg(target_os = "...")]`
+  # (SetWindowPos en Windows, Keychain en macOS) NO pueda romperse sin que el CI lo
+  # vea: el job `check` corre en Linux y nunca toca esas ramas. `cargo check` basta
+  # para validar que compilan (rápido, sin enlazar el binario final).
+  cross-check:
+    name: cargo check (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Caché de compilación de Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Check (cargo check)
+        working-directory: ./src-tauri
+        run: cargo check --all-targets
