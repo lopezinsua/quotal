@@ -486,12 +486,9 @@ fn persist_tokens_keychain(access: &str, refresh: &str, expires_at_ms: i64) {
 /// Persiste los tokens nuevos allí donde Claude Code los lee, según el SO:
 /// fichero en Windows/Linux (y macOS con fallback de fichero), Keychain en macOS.
 fn persist_tokens(access: &str, refresh: &str, expires_at_ms: i64) {
-    // `_wrote`: usado en macOS (para decidir el fallback de Keychain) e ignorado
-    // en Win/Linux, donde solo existe el fichero. El prefijo `_` evita el aviso de
-    // variable sin usar sin recurrir a un `return` que clippy marca como redundante.
-    let _wrote = persist_tokens_file(access, refresh, expires_at_ms);
+    let wrote = persist_tokens_file(access, refresh, expires_at_ms);
     #[cfg(target_os = "macos")]
-    if !_wrote {
+    if !wrote {
         persist_tokens_keychain(access, refresh, expires_at_ms);
     }
 }

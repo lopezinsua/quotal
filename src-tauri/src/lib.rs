@@ -15,6 +15,8 @@
 // Ningún watcher ni sondeo bloquea el hilo de la UI: todo vive en tareas de
 // `tauri::async_runtime` (tokio).
 
+#![allow(dead_code)]
+
 mod claude_code_bridge;
 mod claude_log_parser;
 mod commands;
