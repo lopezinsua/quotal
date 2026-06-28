@@ -5,6 +5,14 @@ All notable changes to Quotal are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-06-28
+
+### Changed
+- Smoother pill ⇆ full morph: the window resize loop is now driven by real
+  elapsed time (no drift) and raises the system timer resolution to 1 ms during
+  the animation, so frames are even instead of stuttering. The content crossfade
+  also scales and shares the same ease-in-out curve as the window.
+
 ## [0.3.0] — 2026-06-28
 
 ### Added
