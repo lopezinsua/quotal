@@ -96,9 +96,10 @@ pub fn run() {
             poller::spawn_watchers(app.handle().clone(), shared.clone());
             poller::spawn_plan_poller(app.handle().clone(), shared.clone());
             // Auto-actualización: comprobación silenciosa en segundo plano. Si hay
-            // una versión nueva, descarga, verifica su firma y la aplica reiniciando.
-            // Los errores (sin red, sin update, en `tauri dev`…) solo se registran.
-            tauri::async_runtime::spawn(check_for_update(app.handle().clone()));
+            // una versión nueva NO la instala; emite `update://available` y es la
+            // UI quien decide mostrar el aviso (con botón de instalar). Los errores
+            // (sin red, sin update, en `tauri dev`…) solo se registran.
+            tauri::async_runtime::spawn(announce_update(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -119,40 +120,31 @@ pub fn run() {
             commands::set_bounds,
             commands::animate_bounds,
             commands::get_config,
+            commands::update_check,
+            commands::update_install,
+            commands::check_system_deps,
         ])
         .run(tauri::generate_context!())
         .expect("error al arrancar la aplicación Tauri");
 }
 
-/// Comprueba si hay una versión más reciente publicada y, si la hay, la descarga,
-/// verifica su firma minisign (con la clave pública de `tauri.conf.json`) y la
-/// instala, reiniciando la app para aplicarla. Es deliberadamente silenciosa: un
-/// widget de segundo plano no debe molestar con diálogos. Cualquier fallo
-/// (sin red, endpoint inaccesible, ejecución sin empaquetar en `tauri dev`…) se
-/// registra y se ignora, sin afectar al funcionamiento normal.
-async fn check_for_update(app: tauri::AppHandle) {
-    use tauri_plugin_updater::UpdaterExt;
-
-    let updater = match app.updater() {
-        Ok(u) => u,
-        Err(e) => {
-            log::info!("Updater no disponible (normal en dev): {e}");
-            return;
-        }
-    };
-
-    match updater.check().await {
-        Ok(Some(update)) => {
-            log::info!("Actualización disponible: v{}. Descargando…", update.version);
-            match update.download_and_install(|_chunk, _total| {}, || {}).await {
-                Ok(()) => {
-                    log::info!("Actualización instalada. Reiniciando para aplicarla.");
-                    app.restart();
-                }
-                Err(e) => log::warn!("No se pudo instalar la actualización: {e}"),
-            }
-        }
-        Ok(None) => log::info!("La app está al día (sin actualizaciones)."),
-        Err(e) => log::warn!("No se pudo comprobar actualizaciones: {e}"),
+/// Comprueba al arranque si hay una versión más reciente y, si la hay, EMITE
+/// `update://available` con el estado para que la UI muestre el aviso (con botón
+/// de instalar). No instala nada por su cuenta: lo decide el usuario. Cualquier
+/// fallo (sin red, endpoint inaccesible, ejecución sin empaquetar en `tauri dev`…)
+/// solo se registra, sin afectar al funcionamiento normal.
+async fn announce_update(app: tauri::AppHandle) {
+    use tauri::Emitter;
+    let status = commands::fetch_update_status(&app).await;
+    if status.available {
+        log::info!(
+            "Actualización disponible: v{}",
+            status.version.as_deref().unwrap_or("?")
+        );
+        let _ = app.emit("update://available", status);
+    } else if let Some(e) = &status.error {
+        log::info!("Comprobación de actualización fallida (se ignora): {e}");
+    } else {
+        log::info!("La app está al día (sin actualizaciones).");
     }
 }

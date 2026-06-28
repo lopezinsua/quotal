@@ -18,6 +18,7 @@ import { ui } from "./state.js";
 import { render } from "./render.js";
 import { applyLayout, restorePosition } from "./window.js";
 import { applyVisualPrefs } from "./controls.js";
+import "./update.js"; // avisos de actualización y de dependencias (efectos al importar)
 
 // Al resolver la tabla del idioma activo, traduce las cadenas estáticas del HTML.
 i18nReady.then(() => applyStaticI18n());

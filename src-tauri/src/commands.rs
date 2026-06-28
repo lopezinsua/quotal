@@ -261,3 +261,176 @@ pub fn get_config(state: State<'_, SharedHandle>) -> serde_json::Value {
         "active_metrics": active,
     })
 }
+
+// ---------------------------------------------------------------------------
+// Auto-actualización: comprobar e instalar bajo demanda (la UI avisa con botón).
+// ---------------------------------------------------------------------------
+
+/// Estado de actualización que viaja al frontend (evento `update://available` y
+/// respuesta de `update_check`).
+#[derive(Serialize, Clone)]
+pub struct UpdateStatus {
+    /// Hay una versión más reciente disponible.
+    pub available: bool,
+    /// Versión disponible (si la hay).
+    pub version: Option<String>,
+    /// Versión instalada actualmente.
+    pub current: String,
+    /// Notas de la versión, si el manifiesto las incluye.
+    pub notes: Option<String>,
+    /// Mensaje de error si la comprobación falló (sin red, en dev, etc.).
+    pub error: Option<String>,
+}
+
+impl UpdateStatus {
+    fn unavailable(error: Option<String>) -> Self {
+        UpdateStatus {
+            available: false,
+            version: None,
+            current: env!("CARGO_PKG_VERSION").to_string(),
+            notes: None,
+            error,
+        }
+    }
+}
+
+/// Consulta el endpoint del updater SIN instalar nada: solo informa. La usan
+/// tanto el arranque (para emitir el aviso) como el botón "Buscar
+/// actualizaciones" de los ajustes.
+pub async fn fetch_update_status(app: &AppHandle) -> UpdateStatus {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => return UpdateStatus::unavailable(Some(e.to_string())),
+    };
+    match updater.check().await {
+        Ok(Some(update)) => UpdateStatus {
+            available: true,
+            version: Some(update.version.clone()),
+            current: update.current_version.clone(),
+            notes: update.body.clone(),
+            error: None,
+        },
+        Ok(None) => UpdateStatus::unavailable(None),
+        Err(e) => UpdateStatus::unavailable(Some(e.to_string())),
+    }
+}
+
+/// Comprobación manual (botón de ajustes). Devuelve el estado al frontend.
+#[tauri::command]
+pub async fn update_check(app: AppHandle) -> UpdateStatus {
+    fetch_update_status(&app).await
+}
+
+/// Descarga la actualización, VERIFICA su firma minisign (clave pública en
+/// tauri.conf.json), la instala y reinicia la app para aplicarla. Re-comprueba
+/// para obtener el artefacto fresco. Devuelve error si algo falla.
+#[tauri::command]
+pub async fn update_install(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "no hay actualización disponible".to_string())?;
+    update.download_and_install(|_chunk, _total| {}, || {}).await.map_err(|e| e.to_string())?;
+    app.restart()
+}
+
+// ---------------------------------------------------------------------------
+// Dependencias del sistema (Linux): librerías nativas que el widget necesita
+// para funcionar al 100% (render WebKit, icono de bandeja, iconos SVG). En
+// Windows/macOS no aplica (el runtime va incrustado o es del sistema): devuelve
+// vacío y la UI no muestra nada.
+// ---------------------------------------------------------------------------
+
+/// Una dependencia nativa que falta, con el paquete a instalar en el gestor
+/// detectado.
+#[derive(Serialize, Clone)]
+pub struct MissingDep {
+    /// Nombre legible (p. ej. "WebKitGTK 4.1").
+    pub name: String,
+    /// Paquete a instalar en el gestor detectado (p. ej. "libwebkit2gtk-4.1-0").
+    pub package: String,
+}
+
+/// Informe de dependencias: las que faltan y un comando para instalarlas todas.
+#[derive(Serialize, Clone, Default)]
+pub struct DepsReport {
+    pub missing: Vec<MissingDep>,
+    /// Comando sugerido (`sudo apt install …`) según el gestor detectado.
+    pub install_hint: Option<String>,
+}
+
+/// Comando: comprueba qué dependencias nativas faltan. La UI lo llama al
+/// arrancar y muestra el aviso solo si la lista no está vacía.
+#[tauri::command]
+pub fn check_system_deps() -> DepsReport {
+    scan_system_deps()
+}
+
+#[cfg(target_os = "linux")]
+pub fn scan_system_deps() -> DepsReport {
+    // (nombre legible, soname a buscar, [paquete apt, dnf, pacman]).
+    let known: &[(&str, &str, [&str; 3])] = &[
+        (
+            "WebKitGTK 4.1",
+            "libwebkit2gtk-4.1.so",
+            ["libwebkit2gtk-4.1-0", "webkit2gtk4.1", "webkit2gtk-4.1"],
+        ),
+        (
+            "Ayatana AppIndicator",
+            "libayatana-appindicator3.so",
+            ["libayatana-appindicator3-1", "libayatana-appindicator-gtk3", "libayatana-appindicator"],
+        ),
+        ("librsvg", "librsvg-2.so", ["librsvg2-2", "librsvg2", "librsvg"]),
+    ];
+
+    // Una sola pasada de `ldconfig -p` lista todas las libs registradas.
+    let listing = std::process::Command::new("ldconfig")
+        .arg("-p")
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
+
+    // Gestor de paquetes -> columna de nombres + prefijo del comando.
+    let (idx, cmd) = if which("apt-get") {
+        (0, "sudo apt install")
+    } else if which("dnf") {
+        (1, "sudo dnf install")
+    } else if which("pacman") {
+        (2, "sudo pacman -S")
+    } else {
+        (0, "sudo apt install")
+    };
+
+    let mut missing = Vec::new();
+    let mut pkgs = Vec::new();
+    for (name, soname, pkg) in known {
+        if !listing.contains(soname) {
+            missing.push(MissingDep { name: name.to_string(), package: pkg[idx].to_string() });
+            pkgs.push(pkg[idx]);
+        }
+    }
+    let install_hint =
+        (!pkgs.is_empty()).then(|| format!("{} {}", cmd, pkgs.join(" ")));
+    DepsReport { missing, install_hint }
+}
+
+/// En el resto de plataformas no hay dependencias nativas que comprobar.
+#[cfg(not(target_os = "linux"))]
+pub fn scan_system_deps() -> DepsReport {
+    DepsReport::default()
+}
+
+/// ¿Está disponible este ejecutable? (detección de gestor de paquetes).
+#[cfg(target_os = "linux")]
+fn which(bin: &str) -> bool {
+    std::process::Command::new(bin)
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}

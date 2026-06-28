@@ -51,6 +51,25 @@ export const el = {
   optLang: document.getElementById("opt-lang"),
   positionGrid: document.getElementById("position-grid"),
   resizeGrip: document.getElementById("resize-grip"),
+  // Aviso de actualización
+  updateBanner: document.getElementById("update-banner"),
+  updateText: document.getElementById("update-text"),
+  updateInstall: document.getElementById("update-install"),
+  updateDismiss: document.getElementById("update-dismiss"),
+  updateMute: document.getElementById("update-mute"),
+  // Aviso de dependencias del sistema
+  depsBanner: document.getElementById("deps-banner"),
+  depsText: document.getElementById("deps-text"),
+  depsToggle: document.getElementById("deps-toggle"),
+  depsDismiss: document.getElementById("deps-dismiss"),
+  depsDetail: document.getElementById("deps-detail"),
+  depsList: document.getElementById("deps-list"),
+  depsCmd: document.getElementById("deps-cmd"),
+  depsCopy: document.getElementById("deps-copy"),
+  // Ajustes de actualización
+  updCurrent: document.getElementById("upd-current"),
+  updCheck: document.getElementById("upd-check"),
+  updStatus: document.getElementById("upd-status"),
 };
 
 export const SOURCE_CLASSES = ["source-hook", "source-logs", "source-sync", "source-none"];

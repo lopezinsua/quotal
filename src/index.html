@@ -47,6 +47,33 @@
           </div>
         </header>
 
+        <!-- Aviso de ACTUALIZACIÓN disponible: el backend emite update://available
+             al arrancar; la UI lo muestra salvo que el usuario eligiera "No mostrar
+             más" para esa versión. -->
+        <div id="update-banner" class="notice notice-update hidden">
+          <span id="update-text" class="notice-text"></span>
+          <div class="notice-actions">
+            <button id="update-install" class="notice-btn primary" data-i18n="upd_install">Update</button>
+            <button id="update-dismiss" class="notice-btn" data-i18n="upd_dismiss">Dismiss</button>
+            <button id="update-mute" class="notice-btn" data-i18n="upd_mute">Don't show again</button>
+          </div>
+        </div>
+
+        <!-- Aviso de DEPENDENCIAS del sistema faltantes (solo Linux). -->
+        <div id="deps-banner" class="notice notice-deps hidden">
+          <span id="deps-text" class="notice-text"></span>
+          <div class="notice-actions">
+            <button id="deps-toggle" class="notice-btn" data-i18n="deps_view">See which</button>
+            <button id="deps-dismiss" class="notice-btn" data-i18n="upd_dismiss">Dismiss</button>
+          </div>
+          <div id="deps-detail" class="notice-detail hidden">
+            <ul id="deps-list" class="deps-list"></ul>
+            <p class="deps-hint" data-i18n="deps_hint">Install them with:</p>
+            <code id="deps-cmd" class="deps-cmd"></code>
+            <button id="deps-copy" class="notice-btn" data-i18n="deps_copy">Copy command</button>
+          </div>
+        </div>
+
         <section id="metrics-view" class="body">
           <!-- Cabecera del plan -->
           <div class="plan-head">
@@ -198,6 +225,14 @@
             <span data-i18n="opt_statusline">Official context (statusLine)</span>
             <input type="checkbox" id="opt-statusline" />
           </label>
+          <div class="setting-col">
+            <span data-i18n="upd_section">Updates</span>
+            <div class="upd-row">
+              <span id="upd-current" class="hint"></span>
+              <button id="upd-check" class="border-reset" data-i18n="upd_check">Check for updates</button>
+            </div>
+            <p id="upd-status" class="hint upd-status"></p>
+          </div>
           <p class="settings-note" data-i18n="note"></p>
           <button id="settings-close" class="settings-back" data-i18n="back">Back</button>
         </section>
