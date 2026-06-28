@@ -491,6 +491,9 @@ fn persist_tokens(access: &str, refresh: &str, expires_at_ms: i64) {
     if !wrote {
         persist_tokens_keychain(access, refresh, expires_at_ms);
     }
+    // Fuera de macOS no hay fallback de Keychain: el valor solo se consulta arriba.
+    #[cfg(not(target_os = "macos"))]
+    let _ = wrote;
 }
 
 async fn get_usage(client: &reqwest::Client, token: &str) -> Result<reqwest::Response, String> {
