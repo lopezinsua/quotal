@@ -11,11 +11,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@eslint/js": "^9",
+    "@eslint/js": "^10",
     "@tauri-apps/cli": "^2",
-    "eslint": "^9",
-    "globals": "^15",
-    "jsdom": "^25",
-    "vitest": "^2"
+    "eslint": "^10",
+    "globals": "^17",
+    "jsdom": "^29",
+    "vitest": "^4"
   }
 }
