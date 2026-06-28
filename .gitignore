@@ -8,6 +8,11 @@ src-tauri/gen/
 # Logs y temporales
 *.log
 npm-debug.log*
+*.tmp
+# Salidas accidentales de la shell (redirecciones, ficheros de scratch sueltos)
+/ahora
+src-tauri/Err
+src-tauri/NO
 
 # Sistema
 .DS_Store

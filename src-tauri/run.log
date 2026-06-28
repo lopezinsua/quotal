@@ -1,5 +1,0 @@
- old
-   Compiling claude-usage-widget v0.1.0 (C:\Users\lucas\Desktop\claude-usage-widget\src-tauri)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.36s
-     Running `target\debug\claude-usage-widget.exe`
-error: process didn't exit successfully: `target\debug\claude-usage-widget.exe` (exit code: 0xffffffff)
