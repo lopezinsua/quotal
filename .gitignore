@@ -1,0 +1,19 @@
+# Dependencias de Node
+node_modules/
+
+# Artefactos de compilación de Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Logs y temporales
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp

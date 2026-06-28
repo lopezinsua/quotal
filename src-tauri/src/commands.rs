@@ -173,6 +173,9 @@ pub fn set_bounds(app: AppHandle, x: i32, y: i32, w: u32, h: u32) -> Result<(), 
 /// Generación de animación: cada nueva animación incrementa el contador y el
 /// hilo en curso se detiene si deja de ser el actual (cancela animaciones
 /// superpuestas al alternar modos rápido, evitando que dos peleen por el tamaño).
+/// Solo se usa en la rama de animación de Windows; en otras plataformas no se
+/// compila (evita un aviso de `dead_code` con clippy `-D warnings`).
+#[cfg(windows)]
 static ANIM_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Anima la ventana desde su posición/tamaño ACTUAL hasta el destino (físicos) en
@@ -188,12 +191,12 @@ pub fn animate_bounds(
     h: u32,
     ms: u64,
 ) -> Result<(), String> {
-    use std::sync::atomic::Ordering;
     use tauri::Manager;
     let win = app.get_webview_window("main").ok_or_else(|| "sin ventana main".to_string())?;
 
     #[cfg(windows)]
     {
+        use std::sync::atomic::Ordering;
         use windows::Win32::Foundation::HWND;
         use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
         let from_pos = win.outer_position().map_err(|e| e.to_string())?;
