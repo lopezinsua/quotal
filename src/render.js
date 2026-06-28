@@ -18,6 +18,39 @@ import {
 // Circunferencia del mini-gauge de la píldora (r=15 en su viewBox 36×36).
 const PILL_GAUGE_CIRC = 2 * Math.PI * 15;
 
+// Respeta la preferencia del SO de reducir movimiento (sin count-up -> valor seco).
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Cuenta el número desde su valor anterior hasta el nuevo con requestAnimationFrame,
+// re-renderizando el texto cada frame con `fmt` (ease-out cúbico). Sensación de
+// medidor que "sube" en vez de saltar de golpe. El valor previo se guarda en el
+// nodo (dataset.val); si no hay (primer dato), aparece directo sin animar. Cancela
+// cualquier cuenta en curso sobre el mismo nodo para no solaparlas.
+const COUNT_MS = 420;
+function countTo(node, to, fmt) {
+  if (!node) return;
+  const prev = Number(node.dataset.val);
+  const from = Number.isFinite(prev) ? prev : to;
+  node.dataset.val = String(to);
+  if (node._raf) cancelAnimationFrame(node._raf);
+  if (REDUCED_MOTION || from === to) {
+    node.textContent = fmt(to);
+    node._raf = null;
+    return;
+  }
+  const start = performance.now();
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / COUNT_MS);
+    const e = 1 - Math.pow(1 - t, 3); // ease-out cúbico, mismo lenguaje que el morph
+    node.textContent = fmt(from + (to - from) * e);
+    node._raf = t < 1 ? requestAnimationFrame(tick) : null;
+  };
+  node._raf = requestAnimationFrame(tick);
+}
+
 // Re-arranca la animación de "cambio de valor" (pulso de color) de forma fiable:
 // quitar la clase + forzar reflow + volver a añadirla reinicia el keyframe.
 function flash(node) {
@@ -57,6 +90,7 @@ export function renderUsagePct(fillEl, pctEl, percent, severity) {
   if (percent == null) {
     fillEl.style.width = "0%";
     pctEl.textContent = "—";
+    delete pctEl.dataset.val; // el próximo valor real aparecerá sin contar desde 0
     return null;
   }
   const pct = Math.min(100, Math.max(0, percent));
@@ -64,7 +98,8 @@ export function renderUsagePct(fillEl, pctEl, percent, severity) {
   const sev = severity || "";
   if (sev === "critical" || pct >= 90) fillEl.classList.add("crit");
   else if (sev === "warning" || pct >= 75) fillEl.classList.add("warn");
-  pctEl.textContent = t("used", { n: pct.toFixed(0) });
+  // Count-up: el "% usado" sube hasta el valor nuevo en vez de saltar.
+  countTo(pctEl, pct, (v) => t("used", { n: Math.round(v) }));
   return pct;
 }
 
@@ -114,7 +149,12 @@ export function render(p) {
   // color de estado vía `--state`. Actualizamos los tres indicadores siempre; el
   // CSS muestra solo el del estilo activo, así cambiar de estilo es instantáneo.
   const pillFrac = sessPct == null ? 0 : Math.min(100, Math.max(0, sessPct)) / 100;
-  el.pillPct.textContent = sessPct != null ? `${sessPct.toFixed(0)}%` : "—";
+  if (sessPct != null) {
+    countTo(el.pillPct, sessPct, (v) => `${Math.round(v)}%`);
+  } else {
+    el.pillPct.textContent = "—";
+    delete el.pillPct.dataset.val;
+  }
   // ring: arco del mini-gauge (15% → anillo al 15%).
   if (el.pillGaugeArc) {
     const arc = (pillFrac * PILL_GAUGE_CIRC).toFixed(2);

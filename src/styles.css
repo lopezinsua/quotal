@@ -1,53 +1,62 @@
-/* styles.css — UI minimalista
+/* styles.css — Quotal · rediseño "Instrument × Focus"
  *
- * Sistema de diseño inspirado en chrome oscuro tipo Raycast/Linear:
- * escalera de superficies casi-negras, bordes "hairline", tipografía con
- * tracking suave y números tabulares, acentos saturados solo donde aportan.
- *(o eso intentaré lol) 
+ * Híbrido: disciplina cromática de un system-monitor (casi monocromo en estado
+ * normal, el color solo entra cuando un bloque cruza warning/critical) + una
+ * jerarquía de HÉROE (la sesión actual domina; semanal y contexto son stat-rows
+ * compactas separadas por divisores hairline).
+ *
+ * Reglas que NO se tocan: todos los IDs/clases que usa el JS se conservan
+ * (#session-pct, .progress-fill.warn/.crit, --fill/--fill-glow, #session-spark…).
+ * El color por severidad sale SIEMPRE de los tokens --state-ok/warn/crit.
  */
 
 :root {
-  /* Superficies (escalera oscura) */
-  --bg-top: #16161a;
-  --bg-bot: #0e0e11;
+  /* Superficies (escalera oscura, grafito neutro) */
+  --bg-top: #17171b;
+  --bg-bot: #0f0f12;
   --surface: rgba(255, 255, 255, 0.04);
   --surface-hover: rgba(255, 255, 255, 0.08);
 
-  /* Texto */
-  --fg: #f4f4f6;
-  --body: #cdcdce;
-  --muted: #8e8e93;
-  --faint: #6a6b6f;
+  /* Texto: jerarquía clara etiqueta-muda / valor-fuerte */
+  --fg: #f5f5f7;
+  --body: #c9c9cd;
+  --muted: #8a8a90;
+  --faint: #66676c;
 
   /* Bordes hairline */
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.14);
 
-  /* Pistas y acentos */
-  --track: rgba(255, 255, 255, 0.07);
+  /* Pistas */
+  --track: rgba(255, 255, 255, 0.06);
+
+  /* DISCIPLINA CROMÁTICA — el verde "ok" es deliberadamente DESATURADO (casi
+     neutro): en estado normal el widget se lee monocromo. El ámbar y el rojo sí
+     son vivos: son la única señal de alarma, así destacan cuando aparecen. */
+  --state-ok: oklch(0.76 0.05 162); /* sage apagado, no "verde de juguete" */
+  --state-warn: #ffc533;
+  --state-crit: #ff5d5d;
+  --state-neutral: var(--faint);
+  /* Relleno de la barra SEMANAL en normal: un slate-índigo igual de apagado, lo
+     justo para distinguirla de la sesión sin romper la calma cromática. */
+  --weekly-ok: oklch(0.66 0.05 264);
+
+  /* --green sigue vivo SOLO como acento de UI (checkboxes, celdas de posición,
+     comando de deps): nada que ver con el dato de uso. */
   --green: #59d499;
   --indigo: #8b95f6;
   --amber: #ffc533;
   --red: #ff6161;
   --accent: var(--faint);
 
-  /* Colores de ESTADO semánticos (no se hardcodean en los componentes: estos
-     tokens son la única fuente de verdad del color por severidad). */
-  --state-ok: var(--green);
-  --state-warn: var(--amber);
-  --state-crit: var(--red);
-  --state-neutral: var(--faint);
-  /* Estado vigente del widget; lo conmutan las clases .sev-* / .source-none.
-     De él cuelgan la píldora, el sparkline y el delta. */
+  /* Estado vigente del widget (lo conmutan .sev-* y .source-none). Alimenta la
+     píldora y el punto de fuente; el sparkline NO depende de él (es monocromo). */
   --state: var(--state-ok);
 
-  /* Colores del BORDE de la ventana por estado. Son la única fuente de verdad
-     del color del marco; el usuario los puede sobreescribir desde Ajustes
-     (controls.js inyecta estas variables en :root). El normal es un hairline
-     translúcido; warn/crit son los anillos de alerta. */
+  /* Borde de la ventana por estado (sobreescribible desde Ajustes vía controls.js). */
   --border-normal: var(--line);
   --border-warn: rgba(255, 197, 51, 0.55);
-  --border-crit: rgba(255, 97, 97, 0.7);
+  --border-crit: rgba(255, 93, 93, 0.7);
 }
 
 * {
@@ -74,52 +83,44 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
-  /* Gradiente sutil para dar profundidad sin sombra (la ventana es del tamaño
-     exacto de la tarjeta, una sombra exterior se recortaría). */
+  /* Gradiente sutil: profundidad sin sombra exterior (la ventana es del tamaño
+     exacto de la tarjeta, una sombra se recortaría). */
   background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 100%);
   border-radius: 14px;
   border: 1px solid var(--border-normal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* `border-radius` se anima para el morph píldora↔completo (14px↔999px) con la
-     misma curva ease-in-out que la ventana (Rust) y el crossfade del contenido. */
+  /* border-radius se anima con la MISMA curva ease-out que el morph de la ventana
+     y el crossfade del contenido (14px↔999px): el cambio se asienta limpio. */
   transition: opacity 0.25s ease, box-shadow 0.3s ease,
-    border-radius 0.24s cubic-bezier(0.65, 0, 0.35, 1);
+    border-radius 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Modo translúcido: deja ver el escritorio. */
 .card.translucent {
   background: linear-gradient(
     180deg,
-    rgba(22, 22, 26, 0.66) 0%,
-    rgba(14, 14, 17, 0.66) 100%
+    rgba(23, 23, 27, 0.66) 0%,
+    rgba(15, 15, 18, 0.66) 100%
   );
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
 
-/* Acento por fuente activa (punto de estado del contexto). */
+/* Acento por fuente activa (punto del contexto). */
 .card.source-hook { --accent: var(--green); }
 .card.source-logs { --accent: var(--amber); }
 .card.source-sync { --accent: #57c1ff; }
 .card.source-none { --accent: var(--faint); --state: var(--state-neutral); }
 
-.card.stale {
-  opacity: 0.5;
-}
+.card.stale { opacity: 0.5; }
 
-/* Aviso por severidad de uso del plan.
- *
- * El anillo de alerta se dibuja con `box-shadow: inset`, NO con `border-color`.
- * Motivo: la ventana es transparente, sin marco y del tamaño exacto de la
- * tarjeta, así que el píxel del borde exterior queda en el mismo canto de la
- * ventana el compositor de Windows lo recorta y, con las esquinas
- * redondeadas, el borde se ve fino/irregular o desaparece a trozos. Un
- * box-shadow interior se pinta dentro del radio y siempre se ve completo.
- * Además animamos el box-shadow (no border-color) para no chocar con la
- * `transition: border-color` de `.card`, que provocaba un parpadeo al
- * entrar/salir del estado. */
+/* Anillo de alerta del MARCO por severidad — se dibuja con box-shadow:inset (no
+   border-color): la ventana es transparente y sin marco, el píxel del borde
+   exterior lo recorta el compositor con las esquinas redondeadas. El inset se
+   pinta dentro del radio y siempre se ve completo; además anima sin chocar con la
+   transición de la tarjeta. Es la ÚNICA señal a nivel de tarjeta: el resto del
+   color de alarma vive en el bloque afectado. */
 .card.sev-warning {
   --state: var(--state-warn);
   box-shadow: inset 0 0 0 1.5px var(--border-warn);
@@ -129,8 +130,6 @@ body {
   box-shadow: inset 0 0 0 1.5px var(--border-crit);
   animation: sev-pulse 2.4s ease-in-out infinite;
 }
-/* El pulso deriva sus opacidades del color crítico vigente (color-mix), así un
-   color personalizado late igual que el rojo por defecto. */
 @keyframes sev-pulse {
   0%, 100% {
     box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--border-crit) 64%, transparent);
@@ -140,34 +139,27 @@ body {
                 inset 0 0 12px color-mix(in srgb, var(--border-crit) 26%, transparent);
   }
 }
-
-/* Opción "no iluminar el borde de la ventana": apaga el anillo de aviso/crítico y
-   su pulso. El color de estado (--state) lo siguen heredando la píldora, el
-   sparkline y el delta, así que solo se apaga el MARCO. */
+/* "No iluminar el borde": apaga solo el MARCO; el bloque crítico sigue tiñéndose. */
 .card.no-glow.sev-warning,
 .card.no-glow.sev-critical {
   box-shadow: none;
   animation: none;
 }
 
-/* Giro fluido del icono de refresco (solo el glifo). */
+/* Giro fluido del icono de refresco (solo el glifo, sobre su propio centro). */
 .icon-btn .ico {
-  display: inline-block;
+  display: block;
   line-height: 1;
+  transform-box: fill-box;
+  transform-origin: center;
 }
-.icon-btn.spinning .ico {
-  animation: spin 0.9s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+.icon-btn.spinning .ico { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ---- Estructura ---- */
-/* El contenido vive en un lienzo de tamaño BASE fijo (248×268). El escalado NO se
- * hace en CSS: se aplica el ZOOM NATIVO del webview (`webview.setZoom`, en
- * window.js), que re-renderiza TODA la página (texto incluido) nítida y de forma
- * fiable en todas las plataformas. La ventana mantiene la proporción BASE, así el
- * lienzo encaja exacto sin huecos ni recortes a cualquier tamaño. */
+/* ---- Estructura ----
+ * Lienzo BASE fijo 248×268. El escalado lo hace el ZOOM NATIVO del webview
+ * (window.js), que re-renderiza nítido en cualquier plataforma; aquí todo va en
+ * px coherentes para aguantar 0.7x–3x sin romperse. */
 #full {
   position: absolute;
   top: 0;
@@ -177,25 +169,21 @@ body {
   display: flex;
   flex-direction: column;
 }
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 10px 7px 12px;
+  padding: 9px 9px 7px 13px;
   cursor: grab;
 }
-.bar:active {
-  cursor: grabbing;
-}
+.bar:active { cursor: grabbing; }
 .title {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.13em;
   color: var(--muted);
 }
 .actions {
@@ -212,8 +200,6 @@ body {
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
   border-radius: 6px;
   transition: color 0.12s ease, background 0.12s ease;
 }
@@ -221,23 +207,16 @@ body {
   color: var(--fg);
   background: var(--surface-hover);
 }
-.icon-btn svg {
-  display: block;
-}
-/* Pin fijado: relleno sólido de la cabeza; suelto: solo contorno. */
-#pin-btn.pinned {
-  color: var(--fg);
-}
-#pin-btn.pinned svg path {
-  fill: currentColor;
-}
+.icon-btn svg { display: block; }
+#pin-btn.pinned { color: var(--fg); }
+#pin-btn.pinned svg path { fill: currentColor; }
 
 .body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 3px 13px 12px;
+  gap: 9px;
+  padding: 3px 13px 11px;
 }
 
 .dot {
@@ -257,103 +236,142 @@ body {
   gap: 8px;
 }
 .plan-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--fg);
 }
 .plan-sub {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--faint);
 }
 
-/* ---- Ventanas de uso (sesión / semanal) ---- */
-.usage-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* ============================================================
+   BLOQUE HÉROE — Sesión actual
+   El protagonista: una "tarjeta dentro de la tarjeta" con micro-profundidad
+   (superficie ligeramente elevada + filo de luz superior). Aloja la etiqueta
+   muda, el % en grande tabular, el sparkline como traza de fondo y la barra.
+   ============================================================ */
+.usage-block { display: flex; flex-direction: column; }
+
+.usage-block.hero {
+  position: relative;
+  padding: 8px 11px 10px;
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.018) 100%
+  );
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
+
+/* Fila superior del héroe: etiqueta muda (izq) + reinicio (der), ambas pequeñas. */
 .usage-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  position: relative;
+  z-index: 1;
 }
 .usage-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--body);
-  letter-spacing: 0.01em;
-  /* La etiqueta puede ser larga (p. ej. "Semanal; todos los modelos"): que se
-     encoja y, si no cabe, se recorte con elipsis pero NUNCA empuje al % a otra
-     línea, para que "93% usado" y "60% usado" queden siempre alineados. */
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.usage-pct {
-  font-size: 13px;
-  font-weight: 650;
+/* El reinicio en la cabecera del héroe (#session-reset es .usage-reset). */
+.hero .usage-reset {
+  font-size: 9px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: none;
+}
+
+/* % HÉROE: dato dominante. Acotado a ~24px (la ventana es 248px de ancho: el
+   valor manda pero "62% usado" entra cómodo incluso en crítico "95% usado"). */
+.hero .usage-pct {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin: 2px 0 9px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  flex: none;
-  white-space: nowrap;
 }
-/* Pulso de color al cambiar el valor: del color de estado de vuelta al normal.
-   Sutil, una sola vez, sin loops que distraigan. */
-.usage-pct.flash {
-  animation: val-flash 0.7s ease;
-}
+/* Pulso de color (una sola vez) cuando llega un valor nuevo. */
+.usage-pct.flash { animation: val-flash 0.7s ease; }
 @keyframes val-flash {
   0% { color: var(--state); }
   100% { color: var(--fg); }
 }
 
-/* Sparkline del % de sesión: línea + área degradada, hereda el color de estado.
-   Un filo de luz (drop-shadow muy tenue) le da relieve sobre la superficie. */
+/* Sparkline como TRAZA MONOCROMA DE FONDO del héroe — no una caja cromática
+   aparte. Ocupa el ancho del bloque por detrás del número; gris apagado y muy
+   tenue: aporta la tendencia sin competir con el color de alarma de la barra.
+   render.js sigue rellenando points/area; aquí solo lo recolocamos. */
 .sparkline {
-  width: 82px;
-  height: 20px;
-  align-self: center;
-  color: var(--state);
-  opacity: 0.92;
-  filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--state) 28%, transparent));
-  transition: color 0.3s ease, opacity 0.25s ease;
-}
-.sparkline.empty {
-  opacity: 0;
-}
-.usage-foot {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 10px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22px;
+  width: 100%;
+  height: 40px;
+  z-index: 0;
   color: var(--muted);
-  letter-spacing: 0.01em;
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
-.usage-tok {
-  font-variant-numeric: tabular-nums;
-}
+.sparkline.empty { opacity: 0; }
 
+/* ---- Pistas de progreso (héroe y compactas) ---- */
 .progress-track {
   position: relative;
   width: 100%;
-  height: 6px;
+  height: 5px;
   background: var(--track);
   border-radius: 999px;
   overflow: hidden;
-  /* Hundido sutil para que la barra de relleno "descanse" dentro de la pista. */
-  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.3);
+  z-index: 1;
 }
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  /* Color base por el token local --fill (transiciona suave). */
+  background-color: var(--fill, var(--state-ok));
+  /* Velo de luz superior INDEPENDIENTE del color: da volumen sin estropear la
+     transición del fondo. Glow del mismo color SOLO en warn/crit (--fill-glow
+     pasa de 0 a un radio visible): la barra avisa por sí sola. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25),
+              0 0 var(--fill-glow, 0px) color-mix(in srgb, var(--fill, transparent) 60%, transparent);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.3s ease, box-shadow 0.3s ease;
+}
+/* Estado NORMAL desaturado; warn/crit (los añade render.js) son la señal viva. */
+.progress-fill.session { --fill: var(--state-ok); }
+.progress-fill.weekly { --fill: var(--weekly-ok); }
+.progress-fill.warn { --fill: var(--state-warn); --fill-glow: 7px; }
+.progress-fill.crit { --fill: var(--state-crit); --fill-glow: 9px; }
 
-/* ---- Estado de carga (antes del primer dato): esqueleto con shimmer ----
-   Minimalista: solo una pasada de luz sobre las pistas vacías. Se retira en
-   cuanto llega un payload (render quita la clase `.loading`). */
+/* Esqueleto de carga: una sola pasada de luz sobre las pistas vacías. */
 .card.loading .progress-track::after {
   content: "";
   position: absolute;
@@ -367,32 +385,47 @@ body {
   transform: translateX(-100%);
   animation: shimmer 1.3s ease-in-out infinite;
 }
-@keyframes shimmer {
-  to { transform: translateX(100%); }
-}
-.progress-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 999px;
-  /* Filo de luz superior + halo del color de relleno: relieve sin recargar. */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
-              0 0 8px color-mix(in srgb, currentColor 0%, transparent);
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
-}
-.progress-fill.session {
-  background: var(--state-ok);
-}
-.progress-fill.weekly {
-  background: var(--indigo);
-}
-.progress-fill.warn {
-  background: var(--state-warn);
-}
-.progress-fill.crit {
-  background: var(--state-crit);
-}
+@keyframes shimmer { to { transform: translateX(100%); } }
 
-/* ---- Línea de contexto (secundaria) ---- */
+/* ============================================================
+   STAT-ROWS COMPACTAS — Semanal y Contexto
+   Secundarias y claramente subordinadas al héroe: separadas por divisores
+   hairline (no por gaps), barra fina, valor pequeño tabular.
+   ============================================================ */
+.usage-block.compact {
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+}
+/* En las compactas la etiqueta vuelve a "sentence case" mudo y el valor es
+   pequeño (la jerarquía la marca el héroe, no hace falta gritar aquí). */
+.usage-block.compact .usage-name {
+  text-transform: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--body);
+}
+.usage-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  flex: none;
+  white-space: nowrap;
+}
+.usage-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--faint);
+  letter-spacing: 0.01em;
+}
+.usage-reset { font-variant-numeric: tabular-nums; }
+
+/* ---- Línea de contexto (stat-row con punto de fuente) ---- */
 .context-line {
   display: flex;
   align-items: center;
@@ -402,14 +435,20 @@ body {
   font-size: 11px;
 }
 .context-label {
-  color: var(--muted);
+  color: var(--body);
   letter-spacing: 0.01em;
+  /* La etiqueta lleva la ventana real ("Contexto · 200k"): si no cabe junto al
+     valor, que se trunque con elipsis en vez de saltar a dos líneas. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .context-pct {
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--body);
+  color: var(--fg);
 }
 
 .freshness {
@@ -418,16 +457,10 @@ body {
   text-align: right;
   margin-top: auto;
   letter-spacing: 0.02em;
-  /* Deja sitio al tirador de redimensionado de la esquina inferior derecha. */
-  padding-right: 12px;
+  padding-right: 12px; /* deja sitio al tirador de la esquina */
 }
-/* Dato no en vivo (offline / sin conexión): se tiñe de ámbar como aviso sutil. */
-.freshness.offline {
-  color: var(--amber);
-}
+.freshness.offline { color: var(--amber); }
 
-/* Aviso de deriva de esquema: discreto pero visible (ámbar), solo si el backend
-   detecta que un formato de Claude Code dejó de reconocerse. */
 .schema-warn {
   font-size: 9px;
   color: var(--amber);
@@ -438,10 +471,7 @@ body {
   line-height: 1.3;
 }
 
-/* ---- Tirador de redimensionado (esquina inferior derecha) ----
- * La ventana es sin marco: el borde inferior/derecho para arrastrar es una
- * franja invisible imposible de agarrar. Este agarre visible se sitúa sobre la
- * esquina y dispara el resize nativo hacia el sureste. */
+/* ---- Tirador de redimensionado (esquina inferior derecha) ---- */
 #resize-grip {
   position: absolute;
   right: 2px;
@@ -459,40 +489,26 @@ body {
   user-select: none;
   z-index: 5;
 }
-#resize-grip:hover {
-  opacity: 1;
-  color: var(--body);
-}
-#resize-grip svg {
-  display: block;
-}
+#resize-grip:hover { opacity: 1; color: var(--body); }
+#resize-grip svg { display: block; }
 
-/* ---- Píldora colapsada ---- */
-/* En modo píldora la tarjeta se redondea por completo (forma de píldora real). */
-.card.is-pill {
-  border-radius: 999px;
-}
+/* ============================================================
+   PÍLDORA COLAPSADA (3 estilos)
+   Todos se alimentan del % de sesión y heredan el color de estado vía --state.
+   Pensados para leerse a 0.7x: en RING manda el arco (número secundario); en
+   BAR el número va pegado a una barra ancha; en MINIMAL el punto + número.
+   ============================================================ */
+.card.is-pill { border-radius: 999px; }
 
-/* Morph píldora<->completo: la VENTANA crece/encoge suavemente (bucle nativo) y
-   aquí acompañamos con un CROSSFADE del contenido (#pill<->#full) y el redondeo del
-   borde (la transición de `border-radius` de `.card` lo anima 14px<->999px). Así no
-   se ve el desajuste de proporción entre la pastilla y la tarjeta: el cambio fluye
-   en vez de "saltar". */
+/* Morph píldora↔completo: crossfade + escala suave con la misma curva ease-out. */
 .card.morphing #full,
 .card.morphing #pill {
-  /* Crossfade + escala con la misma curva ease-in-out que la ventana, para que
-     contenido y tamaño se muevan acompasados. La opacidad va algo más rápida que
-     el transform para que el cruce no muestre las dos vistas nítidas a la vez. */
-  transition: opacity 190ms cubic-bezier(0.65, 0, 0.35, 1),
-    transform 240ms cubic-bezier(0.65, 0, 0.35, 1);
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: center center;
   will-change: opacity, transform;
 }
 
-/* Contenedor común a los tres estilos. El #pill lleva una clase de variante
-   (pill--bar / pill--ring / pill--minimal) que decide qué indicador se ve; el
-   número (#pill-pct) es compartido. Cada variante ajusta gap/padding para
-   centrarse con holgura en su tamaño de ventana propio. */
 .pill {
   width: 100vw;
   height: 100vh;
@@ -511,17 +527,14 @@ body {
   line-height: 1;
   white-space: nowrap;
 }
-/* Por defecto todos los indicadores ocultos; cada variante muestra el suyo. */
 .pill-dot,
 .pill-gauge,
-.pill-bar {
-  display: none;
-}
+.pill-bar { display: none; }
 
-/* — Variante BAR: número + barra lineal de progreso — */
+/* — BAR: número + barra lineal ancha — */
 .pill--bar {
   gap: 7px;
-  padding: 0 10px;
+  padding: 0 11px;
 }
 .pill--bar #pill-pct {
   font-size: 11px;
@@ -535,8 +548,7 @@ body {
   background: var(--track);
   border-radius: 999px;
   overflow: hidden;
-  /* Hundido sutil, como la pista de la vista completa. */
-  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.3);
 }
 .pill-bar-fill {
   display: block;
@@ -548,76 +560,66 @@ body {
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
 
-/* — Variante RING: mini gauge (réplica del logo) + número — */
+/* — RING: mini-gauge protagonista + número secundario — */
 .pill--ring {
-  gap: 6px;
-  padding: 0 9px;
+  gap: 7px;
+  padding: 0 10px;
 }
 .pill--ring #pill-pct {
-  font-size: 11px;
-  flex: none; /* nunca encoger el número: el "%" se recortaba con 3 dígitos */
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--body); /* secundario: el arco es quien manda */
+  flex: none;
 }
-.pill--ring .pill-gauge {
-  display: block;
-}
-/* Mini-gauge: se llena con el % de sesión. Hereda el color de estado vía
-   `--state`. Rotado −90° para que el arco arranque arriba. Tamaño legible para
-   que el RELLENO se perciba (antes, a 14px y con la pista casi invisible, parecía
-   un logo estático sin moverse). */
+.pill--ring .pill-gauge { display: block; }
+/* Gauge grande y de trazo grueso para que el RELLENO se perciba a simple vista
+   (y a 0.7x). Rotado −90° para arrancar arriba. Hereda --state. */
 .pill-gauge {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex: none;
   transform: rotate(-90deg);
 }
 .pg-track {
   fill: none;
-  /* Pista bien visible (no la translúcida 0.07 de la vista completa): así el
-     anillo se lee como un medidor incluso con poco relleno. */
   stroke: rgba(255, 255, 255, 0.16);
-  stroke-width: 4.5;
+  stroke-width: 5;
 }
 .pg-arc {
   fill: none;
   stroke: var(--state);
-  stroke-width: 4.5;
+  stroke-width: 5;
   stroke-linecap: round;
   stroke-dasharray: 0 94.25;
-  /* Halo tenue del color de estado para que el arco "salte" sobre la pista. */
   filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--state) 45%, transparent));
   transition: stroke-dasharray 0.5s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
 }
 
-/* Variante MINIMAL: punto de estado + número */
+/* — MINIMAL: punto de estado + número (aquí el número sí es el dato) — */
 .pill--minimal {
   gap: 6px;
-  padding: 0 10px;
+  padding: 0 11px;
 }
-.pill--minimal #pill-pct {
-  font-size: 11.5px;
-}
-.pill--minimal .pill-dot {
-  display: block;
-}
+.pill--minimal #pill-pct { font-size: 11.5px; }
+.pill--minimal .pill-dot { display: block; }
 .pill-dot {
   width: 6px;
   height: 6px;
   flex: none;
   border-radius: 50%;
   background: var(--state);
-  /* Halo tenue del color de estado, igual que el punto de la fuente activa. */
   box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--state) 18%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* ---- Configuración ---- */
+/* ============================================================
+   AJUSTES  (sin cambios de fondo: solo heredan los tokens nuevos)
+   ============================================================ */
 #settings-view {
   overflow-y: auto;
   gap: 9px;
 }
-#settings-view::-webkit-scrollbar {
-  width: 6px;
-}
+#settings-view::-webkit-scrollbar { width: 6px; }
 #settings-view::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.16);
   border-radius: 3px;
@@ -665,15 +667,12 @@ body {
   cursor: pointer;
   max-width: 130px;
 }
-.lang-select:hover {
-  background: var(--surface-hover);
-}
+.lang-select:hover { background: var(--surface-hover); }
 .lang-select option {
-  background: #16161a;
+  background: #17171b;
   color: var(--fg);
 }
 
-/* ---- Selector de posición (mini-pantalla con 9 anclajes) ---- */
 .setting-col {
   display: flex;
   flex-direction: column;
@@ -719,23 +718,18 @@ body {
   opacity: 0.4;
   transition: background 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
 }
-.pos-cell:hover {
-  background: var(--surface-hover);
-}
+.pos-cell:hover { background: var(--surface-hover); }
 .pos-cell:hover::after {
   background: var(--green);
   opacity: 1;
   transform: scale(1.15);
 }
-.pos-cell.active {
-  background: color-mix(in srgb, var(--green) 16%, transparent);
-}
+.pos-cell.active { background: color-mix(in srgb, var(--green) 16%, transparent); }
 .pos-cell.active::after {
   background: var(--green);
   opacity: 1;
 }
 
-/* ---- Selectores de color del borde (3 estados) ---- */
 .border-colors {
   display: flex;
   gap: 8px;
@@ -750,8 +744,6 @@ body {
   color: var(--muted);
   cursor: pointer;
 }
-/* Quitamos el chrome nativo del input para que el swatch encaje con el resto:
-   borde hairline, esquinas redondeadas y una muestra a sangre dentro. */
 .border-swatch input[type="color"] {
   -webkit-appearance: none;
   appearance: none;
@@ -763,12 +755,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-.border-swatch input[type="color"]:hover {
-  border-color: var(--line-strong);
-}
-.border-swatch input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
+.border-swatch input[type="color"]:hover { border-color: var(--line-strong); }
+.border-swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .border-swatch input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 4px;
@@ -818,9 +806,7 @@ body {
   border-color: var(--line-strong);
 }
 
-/* ---- Avisos (banners): actualización y dependencias ----
- * Franja compacta bajo la cabecera. Color de acento por tipo: indigo para
- * actualización (informativo), ámbar para dependencias (acción recomendada). */
+/* ---- Avisos (banners): actualización y dependencias ---- */
 .notice {
   margin: 6px 10px 0;
   padding: 7px 9px;
@@ -874,9 +860,7 @@ body {
   color: #14141a;
   font-weight: 600;
 }
-.notice-btn.primary:hover {
-  filter: brightness(1.08);
-}
+.notice-btn.primary:hover { filter: brightness(1.08); }
 .notice-detail {
   display: flex;
   flex-direction: column;
@@ -911,13 +895,23 @@ body {
   -webkit-user-select: text;
   user-select: text;
 }
-/* Fila de "Buscar actualizaciones" en ajustes. */
 .upd-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
-.upd-status {
-  min-height: 12px;
+.upd-status { min-height: 12px; }
+
+/* ---- Respeta la preferencia del SO de reducir movimiento ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  .card,
+  .progress-fill,
+  .pill-bar-fill,
+  .pg-arc,
+  .icon-btn .ico {
+    animation: none !important;
+    transition: none !important;
+  }
 }
