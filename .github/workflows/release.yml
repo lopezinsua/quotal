@@ -64,7 +64,7 @@ jobs:
     env:
       WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Dependencias nativas de WebKitGTK + bandeja del sistema (solo Linux).
       - name: Instalar dependencias de Linux
@@ -88,7 +88,7 @@ jobs:
           workspaces: "./src-tauri -> target"
 
       - name: Configurar Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
