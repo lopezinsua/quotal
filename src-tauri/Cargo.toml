@@ -1,6 +1,6 @@
 [package]
 name = "quotal"
-version = "0.2.0"
+version = "0.3.0"
 description = "Quotal — widget de escritorio que muestra el uso restante de Claude (sesion 5h, semana 7d y contexto)"
 edition = "2021"
 

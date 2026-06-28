@@ -5,6 +5,23 @@ All notable changes to Quotal are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-28
+
+### Added
+- **In-app update notice**: instead of updating silently, Quotal now shows a
+  banner when a new version is available, with **Update**, **Dismiss** and
+  **Don't show again** (the last one mutes that version until a newer one ships).
+  A new "Updates" section in Settings shows the installed version and a manual
+  "Check for updates" button.
+- **System dependency check (Linux)**: on startup Quotal detects missing native
+  libraries (WebKitGTK, Ayatana AppIndicator, librsvg) and, if any are missing,
+  opens the widget to show how many, which ones, and the exact install command
+  (apt/dnf/pacman) with a copy button. No-op on Windows/macOS.
+
+### Changed
+- The auto-updater no longer installs and restarts on its own; updates are now
+  user-initiated from the notice.
+
 ## [0.2.0] — 2026-06-28
 
 First release with **automatic updates**.
