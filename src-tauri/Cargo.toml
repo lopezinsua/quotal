@@ -16,6 +16,9 @@ tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-ap
 tauri-plugin-store = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
+# Auto-actualización: comprueba el endpoint de releases, verifica la firma
+# minisign del artefacto (clave pública en tauri.conf.json) y aplica la update.
+tauri-plugin-updater = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
