@@ -1,0 +1,35 @@
+# Mantiene las dependencias al día y avisa de vulnerabilidades (CVE).
+# Agrupa las actualizaciones para no inundar de PRs.
+version: 2
+updates:
+  # Crates de Rust (backend Tauri).
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      rust-dependencies:
+        patterns:
+          - "*"
+
+  # Dependencias de npm (frontend / tooling).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
+  # Las propias GitHub Actions (checkout, setup-node, tauri-action, etc.).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"

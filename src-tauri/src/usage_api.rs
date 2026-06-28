@@ -19,7 +19,7 @@ const OAUTH_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA: &str = "oauth-2025-04-20";
-const USER_AGENT: &str = "quotal/0.1";
+const USER_AGENT: &str = concat!("quotal/", env!("CARGO_PKG_VERSION"));
 
 /// Bloque de plan que viaja al frontend. `available=false` + `error` cuando no
 /// se pudo obtener (sin credenciales, sin red, token irrecuperable…).
