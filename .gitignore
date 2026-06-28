@@ -17,3 +17,18 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Secretos y claves — NUNCA deben subirse al repo
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*.p12
+*.jks
+*.keystore
+secrets.*
+*.secret
+# Clave de firma del auto-updater (minisign): vive en GitHub Secrets, no aquí
+*updater*.key
+*.key.pub
