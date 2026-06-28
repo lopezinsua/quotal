@@ -32,7 +32,13 @@ reqwest = { version = "0.12", features = ["json"] }
 # intermedio). Misma versión que usa Tauri para reutilizar su tipo HWND sin
 # conflictos. En macOS/Linux se usa el fallback de dos pasos (sin esta dependencia).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    # timeBeginPeriod/timeEndPeriod: sube la resolución del temporizador durante
+    # la animación de la píldora para que los frames sean uniformes (sin tirones).
+    "Win32_Media",
+] }
 
 [lib]
 name = "quotal_lib"

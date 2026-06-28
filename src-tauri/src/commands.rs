@@ -209,17 +209,25 @@ pub fn animate_bounds(
         let (tx, ty, tw, th) = (x as f64, y as f64, w as f64, h as f64);
         let my_gen = ANIM_GEN.fetch_add(1, Ordering::SeqCst) + 1;
         std::thread::spawn(move || {
+            use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
             let hwnd = HWND(hwnd_raw as *mut core::ffi::c_void);
-            let frames = ((ms as f64 / 8.0).round() as i64).max(1);
-            for i in 1..=frames {
+            // Sube la resolución del temporizador a 1 ms durante la animación. Sin
+            // esto, `sleep` en Windows redondea a ~15 ms y los frames salen
+            // irregulares (se percibe a tirones). Se restaura al terminar.
+            unsafe { timeBeginPeriod(1) };
+            let total_ms = ms.max(1) as f64;
+            let start = std::time::Instant::now();
+            loop {
                 if ANIM_GEN.load(Ordering::SeqCst) != my_gen {
-                    return; // animación superada por otra
+                    break; // animación superada por otra
                 }
-                let t = i as f64 / frames as f64;
-                // Ease-in-out cúbico: arranca y termina suave (acelera y frena),
-                // se siente más "asentado" en un morph que el ease-out puro.
-                // Mismo curva que el CSS del contenido (cubic-bezier(0.65,0,0.35,1))
-                // para que ventana y crossfade vayan acompasados.
+                // Progreso por TIEMPO REAL transcurrido, no por número de frame:
+                // aunque un frame se retrase, la posición sigue siendo la correcta
+                // para ese instante → movimiento uniforme, sin acumular deriva.
+                let t = (start.elapsed().as_secs_f64() * 1000.0 / total_ms).min(1.0);
+                // Ease-in-out cúbico, misma curva que el CSS del contenido
+                // (cubic-bezier(0.65,0,0.35,1)) para que ventana y crossfade
+                // vayan acompasados.
                 let e =
                     if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 };
                 let cx = (fx + (tx - fx) * e).round() as i32;
@@ -229,8 +237,12 @@ pub fn animate_bounds(
                 unsafe {
                     let _ = SetWindowPos(hwnd, None, cx, cy, cw, ch, SWP_NOZORDER | SWP_NOACTIVATE);
                 }
-                std::thread::sleep(std::time::Duration::from_millis(8));
+                if t >= 1.0 {
+                    break; // llegó al destino exacto
+                }
+                std::thread::sleep(std::time::Duration::from_millis(4));
             }
+            unsafe { timeEndPeriod(1) };
         });
         Ok(())
     }
