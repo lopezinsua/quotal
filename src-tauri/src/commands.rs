@@ -382,7 +382,11 @@ pub fn scan_system_deps() -> DepsReport {
         (
             "Ayatana AppIndicator",
             "libayatana-appindicator3.so",
-            ["libayatana-appindicator3-1", "libayatana-appindicator-gtk3", "libayatana-appindicator"],
+            [
+                "libayatana-appindicator3-1",
+                "libayatana-appindicator-gtk3",
+                "libayatana-appindicator",
+            ],
         ),
         ("librsvg", "librsvg-2.so", ["librsvg2-2", "librsvg2", "librsvg"]),
     ];
@@ -414,8 +418,7 @@ pub fn scan_system_deps() -> DepsReport {
             pkgs.push(pkg[idx]);
         }
     }
-    let install_hint =
-        (!pkgs.is_empty()).then(|| format!("{} {}", cmd, pkgs.join(" ")));
+    let install_hint = (!pkgs.is_empty()).then(|| format!("{} {}", cmd, pkgs.join(" ")));
     DepsReport { missing, install_hint }
 }
 

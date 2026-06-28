@@ -137,10 +137,7 @@ async fn announce_update(app: tauri::AppHandle) {
     use tauri::Emitter;
     let status = commands::fetch_update_status(&app).await;
     if status.available {
-        log::info!(
-            "Actualización disponible: v{}",
-            status.version.as_deref().unwrap_or("?")
-        );
+        log::info!("Actualización disponible: v{}", status.version.as_deref().unwrap_or("?"));
         let _ = app.emit("update://available", status);
     } else if let Some(e) = &status.error {
         log::info!("Comprobación de actualización fallida (se ignora): {e}");
