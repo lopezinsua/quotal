@@ -16,6 +16,6 @@
     "eslint": "^9",
     "globals": "^15",
     "jsdom": "^25",
-    "vitest": "^2"
+    "vitest": "^3"
   }
 }
