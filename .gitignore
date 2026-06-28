@@ -29,6 +29,9 @@ Thumbs.db
 *.keystore
 secrets.*
 *.secret
+# Bases de datos de gestores de contraseñas (KeePass, etc.)
+*.kdbx
+*.kdb
 # Clave de firma del auto-updater (minisign): vive en GitHub Secrets, no aquí
 *updater*.key
 *.key.pub
