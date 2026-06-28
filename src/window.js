@@ -129,7 +129,7 @@ async function applyLayoutOnce() {
 
 // Duración del morph píldora<->completo (ms). Igual en JS (crossfade/borde) y en el
 // bucle de tamaño de la ventana (Rust), para que vayan sincronizados.
-const MORPH_MS = 210;
+const MORPH_MS = 240;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Morph fluido entre píldora y completo: la VENTANA crece/encoge suavemente (bucle
@@ -149,13 +149,19 @@ async function runMorph(expanded, fullScale, tl, physW, physH) {
   // Zoom del completo fijo durante el morph (sin pelear con onResized, que se inhibe
   // con ui.animating).
   applyZoom(fullScale);
-  // Crossfade: fijamos opacidad INICIAL, forzamos reflow y ponemos la FINAL para que
-  // la transición de opacidad se dispare.
+  // Crossfade + ESCALA: además de la opacidad, el contenido crece/encoge un pelín
+  // mientras aparece/desaparece, así el morph "fluye" hacia su forma en vez de un
+  // simple fundido. Fijamos estados INICIALES, forzamos reflow y ponemos los
+  // FINALES para disparar la transición CSS (opacidad + transform).
   el.full.style.opacity = expanded ? "0" : "1";
   el.pill.style.opacity = expanded ? "1" : "0";
+  el.full.style.transform = expanded ? "scale(0.96)" : "scale(1)";
+  el.pill.style.transform = expanded ? "scale(1)" : "scale(0.92)";
   void el.card.offsetWidth;
   el.full.style.opacity = expanded ? "1" : "0";
   el.pill.style.opacity = expanded ? "0" : "1";
+  el.full.style.transform = expanded ? "scale(1)" : "scale(0.96)";
+  el.pill.style.transform = expanded ? "scale(0.92)" : "scale(1)";
 
   invoke("animate_bounds", { x: tl.x, y: tl.y, w: physW, h: physH, ms: MORPH_MS }).catch((e) =>
     console.error("animate_bounds:", e),
@@ -169,6 +175,8 @@ async function runMorph(expanded, fullScale, tl, physW, physH) {
   el.card.classList.remove("morphing");
   el.full.style.opacity = "";
   el.pill.style.opacity = "";
+  el.full.style.transform = "";
+  el.pill.style.transform = "";
   if (expanded) {
     el.full.classList.remove("hidden");
     el.pill.classList.add("hidden");

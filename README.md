@@ -78,6 +78,10 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list of changes per release.
+
 ## License
 
 [MIT](LICENSE) © lopezinsua

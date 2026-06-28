@@ -179,7 +179,7 @@ pub fn set_bounds(app: AppHandle, x: i32, y: i32, w: u32, h: u32) -> Result<(), 
 static ANIM_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Anima la ventana desde su posición/tamaño ACTUAL hasta el destino (físicos) en
-/// `ms`, con easing (ease-out cúbico). En Windows mueve+redimensiona con
+/// `ms`, con easing (ease-in-out cúbico). En Windows mueve+redimensiona con
 /// `SetWindowPos` en un hilo a ~120 fps (suave, sin IPC por frame). En otras
 /// plataformas aplica el destino de golpe (sin animar).
 #[tauri::command]
@@ -216,7 +216,12 @@ pub fn animate_bounds(
                     return; // animación superada por otra
                 }
                 let t = i as f64 / frames as f64;
-                let e = 1.0 - (1.0 - t).powi(3); // ease-out cúbico
+                // Ease-in-out cúbico: arranca y termina suave (acelera y frena),
+                // se siente más "asentado" en un morph que el ease-out puro.
+                // Mismo curva que el CSS del contenido (cubic-bezier(0.65,0,0.35,1))
+                // para que ventana y crossfade vayan acompasados.
+                let e =
+                    if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 };
                 let cx = (fx + (tx - fx) * e).round() as i32;
                 let cy = (fy + (ty - fy) * e).round() as i32;
                 let cw = ((fw + (tw - fw) * e).round() as i32).max(1);
