@@ -155,10 +155,14 @@ export function render(p) {
     el.pillPct.textContent = "—";
     delete el.pillPct.dataset.val;
   }
-  // ring: arco del mini-gauge (15% → anillo al 15%).
+  // ring: arco del mini-gauge (15% → anillo al 15%). OJO: se fija como ESTILO
+  // INLINE, no como atributo. La regla CSS `.pg-arc { stroke-dasharray: 0 94.25 }`
+  // (que da el estado inicial vacío + la transición) GANA en la cascada a un
+  // atributo de presentación, así que un setAttribute aquí se ignora y el arco se
+  // queda clavado. El inline manda sobre la clase y deja que la transición lo anime.
   if (el.pillGaugeArc) {
     const arc = (pillFrac * PILL_GAUGE_CIRC).toFixed(2);
-    el.pillGaugeArc.setAttribute("stroke-dasharray", `${arc} ${PILL_GAUGE_CIRC.toFixed(2)}`);
+    el.pillGaugeArc.style.strokeDasharray = `${arc} ${PILL_GAUGE_CIRC.toFixed(2)}`;
   }
   // bar: ancho de la barra lineal.
   if (el.pillBarFill) {
