@@ -366,8 +366,11 @@ fn replace_marked_command(settings: &mut Value, event: &str, marker: &str, new_c
             continue;
         };
         for h in hooks.iter_mut() {
-            let is_ours =
-                h.get("command").and_then(|c| c.as_str()).map(|c| c.contains(marker)).unwrap_or(false);
+            let is_ours = h
+                .get("command")
+                .and_then(|c| c.as_str())
+                .map(|c| c.contains(marker))
+                .unwrap_or(false);
             if !is_ours {
                 continue;
             }
@@ -389,10 +392,12 @@ fn replace_marked_command(settings: &mut Value, event: &str, marker: &str, new_c
 /// en el momento de instalar; si la app se mueve, se renombra su carpeta o se
 /// actualiza, esa ruta queda obsoleta y el hook deja de funcionar silenciosamente.
 /// Aquí, en cada arranque:
-///   - Windows: `build_*_command` REESCRIBE el `.vbs` con el exe actual (su ruta
-///     fija en `settings.json` no cambia, así que normalmente no tocamos el JSON).
-///   - Unix: el exe va en el propio comando de `settings.json`; si cambió, lo
-///     actualizamos.
+///
+/// - Windows: `build_*_command` REESCRIBE el `.vbs` con el exe actual (su ruta
+///   fija en `settings.json` no cambia, así que normalmente no tocamos el JSON).
+/// - Unix: el exe va en el propio comando de `settings.json`; si cambió, lo
+///   actualizamos.
+///
 /// Esto también propaga a instalaciones antiguas la versión nueva de los scripts
 /// (p. ej. el cierre limpio con `--quit` en vez del viejo `taskkill /F`).
 /// Best-effort: cualquier fallo se ignora (no debe impedir el arranque).
@@ -402,7 +407,8 @@ pub fn resync_installed_hooks() {
 
     if event_has_marker(&settings, "SessionStart", AUTOSTART_MARKER) {
         if let Ok(cmd) = build_autostart_command() {
-            changed |= replace_marked_command(&mut settings, "SessionStart", AUTOSTART_MARKER, &cmd);
+            changed |=
+                replace_marked_command(&mut settings, "SessionStart", AUTOSTART_MARKER, &cmd);
         }
     }
     if event_has_marker(&settings, "SessionEnd", SHUTDOWN_MARKER) {
