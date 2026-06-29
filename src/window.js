@@ -127,15 +127,9 @@ async function applyLayoutOnce() {
   ui.prevExpanded = expanded;
 }
 
-// Duración del morph píldora<->completo (ms). Una sola curva ease-out (sin rebote)
-// para VENTANA (bucle Rust), crossfade del contenido y border-radius: todo arranca
-// y se asienta acompasado. 280ms = responde al instante y se siente sólido.
-const MORPH_MS = 280;
-
-// Escala inicial del contenido que ENTRA en el crossfade (crece de aquí a 1, sin
-// sobrepasar). Simétrica en ambos sentidos para que el morph se sienta igual de
-// limpio al expandir y al colapsar.
-const MORPH_SCALE_FROM = 0.96;
+// Duración del morph píldora<->completo (ms). Igual en JS (crossfade/borde) y en el
+// bucle de tamaño de la ventana (Rust), para que vayan sincronizados.
+const MORPH_MS = 240;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Morph fluido entre píldora y completo: la VENTANA crece/encoge suavemente (bucle
@@ -159,25 +153,21 @@ async function runMorph(expanded, fullScale, tl, physW, physH) {
   // mientras aparece/desaparece, así el morph "fluye" hacia su forma en vez de un
   // simple fundido. Fijamos estados INICIALES, forzamos reflow y ponemos los
   // FINALES para disparar la transición CSS (opacidad + transform).
-  const from = `scale(${MORPH_SCALE_FROM})`;
-  const to = "scale(1)";
   el.full.style.opacity = expanded ? "0" : "1";
   el.pill.style.opacity = expanded ? "1" : "0";
-  el.full.style.transform = expanded ? from : to;
-  el.pill.style.transform = expanded ? to : from;
+  el.full.style.transform = expanded ? "scale(0.96)" : "scale(1)";
+  el.pill.style.transform = expanded ? "scale(1)" : "scale(0.92)";
   void el.card.offsetWidth;
   el.full.style.opacity = expanded ? "1" : "0";
   el.pill.style.opacity = expanded ? "0" : "1";
-  el.full.style.transform = expanded ? to : from;
-  el.pill.style.transform = expanded ? from : to;
+  el.full.style.transform = expanded ? "scale(1)" : "scale(0.96)";
+  el.pill.style.transform = expanded ? "scale(0.92)" : "scale(1)";
 
   invoke("animate_bounds", { x: tl.x, y: tl.y, w: physW, h: physH, ms: MORPH_MS }).catch((e) =>
     console.error("animate_bounds:", e),
   );
 
-  // +60ms de margen para que las transiciones del contenido y el border-radius
-  // (280ms) terminen del todo antes de retirar la clase `morphing` y fijar el final.
-  await sleep(MORPH_MS + 60);
+  await sleep(MORPH_MS + 40);
 
   // Estado final canónico (por si otra animación lo superó, comprobamos que el modo
   // objetivo sigue siendo el vigente).

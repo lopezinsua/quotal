@@ -179,7 +179,7 @@ pub fn set_bounds(app: AppHandle, x: i32, y: i32, w: u32, h: u32) -> Result<(), 
 static ANIM_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Anima la ventana desde su posición/tamaño ACTUAL hasta el destino (físicos) en
-/// `ms`, con easing (ease-out exponencial, sin sobrepaso). En Windows mueve+redimensiona con
+/// `ms`, con easing (ease-in-out cúbico). En Windows mueve+redimensiona con
 /// `SetWindowPos` en un hilo a ~120 fps (suave, sin IPC por frame). En otras
 /// plataformas aplica el destino de golpe (sin animar).
 #[tauri::command]
@@ -225,13 +225,11 @@ pub fn animate_bounds(
                 // aunque un frame se retrase, la posición sigue siendo la correcta
                 // para ese instante → movimiento uniforme, sin acumular deriva.
                 let t = (start.elapsed().as_secs_f64() * 1000.0 / total_ms).min(1.0);
-                // Ease-OUT exponencial: arranca rápido y aterriza con una
-                // desaceleración muy suave, SIN sobrepaso ni rebote. Es la misma
-                // sensación que las animaciones de ventana del SO: responde al
-                // instante y se asienta limpio. La misma curva (su aprox. en
-                // cubic-bezier) se usa en el CSS del contenido y del border-radius,
-                // así ventana, crossfade y esquina se mueven acompasados.
-                let e = if t >= 1.0 { 1.0 } else { 1.0 - 2f64.powf(-10.0 * t) };
+                // Ease-in-out cúbico, misma curva que el CSS del contenido
+                // (cubic-bezier(0.65,0,0.35,1)) para que ventana y crossfade
+                // vayan acompasados.
+                let e =
+                    if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 };
                 let cx = (fx + (tx - fx) * e).round() as i32;
                 let cy = (fy + (ty - fy) * e).round() as i32;
                 let cw = ((fw + (tw - fw) * e).round() as i32).max(1);
