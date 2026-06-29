@@ -10,7 +10,7 @@
 
 import { win, currentMonitor, LogicalSize } from "./tauri.js";
 import { el } from "./dom.js";
-import { prefs } from "./prefs.js";
+import { prefs, onFlushPrefs } from "./prefs.js";
 import { ui } from "./state.js";
 import { fullSizeFor, fitMaxScale, applyZoom, FULL_MIN, BASE_W, BASE_H } from "./geometry.js";
 import { captureAnchor, isSuppressed } from "./anchor.js";
@@ -20,6 +20,7 @@ import { captureAnchor, isSuppressed } from "./anchor.js";
 // asomar (peeking sin mover).
 let moveIdleTimer = null;
 let savePosTimer = null;
+let savePosPending = false; // hay un guardado de ancla con debounce sin vaciar?
 win.onMoved(() => {
   // Respaldo de fin de arrastre: si el SO se tragó el `pointerup`/`mouseup`, el
   // movimiento se da por terminado tras un rato sin desplazarse. NO se dispara
@@ -37,9 +38,23 @@ win.onMoved(() => {
   // reposo: persistimos el ANCLA (esquina + coordenada), debounced para no leer
   // tamaño/monitor en cada evento.
   clearTimeout(savePosTimer);
+  savePosPending = true;
   savePosTimer = setTimeout(() => {
+    savePosPending = false;
     captureAnchor().catch((e) => console.error("saveAnchor:", e));
   }, 140);
+});
+
+// Si la ventana se oculta/cierra con un guardado de ancla aún pendiente (el
+// debounce de 140 ms no ha saltado), vaciamos ya — así no se pierde la última
+// posición. Es "best-effort": `captureAnchor` es asíncrono (lee posición por
+// IPC), por lo que al ocultar a bandeja completa; en un cierre duro puede no
+// llegar, pero el arrastre normal del usuario ya persiste al soltar (endMove).
+onFlushPrefs(() => {
+  if (!savePosPending) return;
+  savePosPending = false;
+  clearTimeout(savePosTimer);
+  captureAnchor().catch((e) => console.error("saveAnchor:", e));
 });
 
 const MOVE_THRESHOLD = 3; // px de holgura para distinguir click de arrastre

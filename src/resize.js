@@ -9,7 +9,7 @@
 // Controlando solo el ancho, el alto lo fijamos nosotros (= ancho / proporción).
 
 import { win, currentMonitor, LogicalSize, PhysicalPosition } from "./tauri.js";
-import { prefs, savePrefs } from "./prefs.js";
+import { prefs, savePrefs, onFlushPrefs } from "./prefs.js";
 import { ui } from "./state.js";
 import { clamp, BASE_W, BASE_H, MIN_SCALE, MAX_SCALE, fitMaxScale, applyZoom, getSF, setSF } from "./geometry.js";
 import { setPos, readAnchor } from "./anchor.js";
@@ -48,6 +48,7 @@ async function prepResizeBounds() {
 // (por si acaso) reubica la ventana dentro del monitor.
 async function settleResize(w, h) {
   prefs.fullSize = { w, h };
+  pendingFullSize = null; // ya persistido aquí: nada que vaciar
   try {
     const mon = await currentMonitor();
     // Restaura el tope al máximo que CABE en este monitor (no un valor estático),
@@ -81,6 +82,17 @@ async function settleResize(w, h) {
 let settleTimer = null;
 let pendingPayload = null;
 let resizeRaf = 0;
+
+// Último tamaño calculado aún NO persistido en disco (el debounce de `settle`
+// no ha saltado). Si la app se cierra antes, `flushPrefs` lo guarda — así no se
+// pierde el último redimensionado del usuario.
+let pendingFullSize = null;
+onFlushPrefs(() => {
+  if (pendingFullSize) {
+    prefs.fullSize = pendingFullSize;
+    pendingFullSize = null;
+  }
+});
 
 win.onResized(({ payload }) => {
   // Durante el morph píldora<->completo, el tamaño lo conduce el bucle de Rust y el
@@ -129,6 +141,9 @@ function processResize() {
   // vuelve a llamar a setSize. Fire-and-forget para no bloquear el frame.
   const wantW = Math.round(BASE_W * scale);
   const wantH = Math.round(BASE_H * scale);
+  // Marca este tamaño como pendiente de persistir: si la app se cierra antes de
+  // que salte `settleTimer`, `flushPrefs` lo guardará.
+  pendingFullSize = { w: wantW, h: wantH };
   if (Math.abs(logicalH - wantH) > 1 || Math.abs(logicalW - wantW) > 1) {
     win.setSize(new LogicalSize(wantW, wantH)).catch((e) => console.error("resize lock:", e));
   }

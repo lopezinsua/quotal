@@ -18,16 +18,58 @@ import { ui } from "./state.js";
 import { render } from "./render.js";
 import { applyLayout, restorePosition } from "./window.js";
 import { applyVisualPrefs } from "./controls.js";
+import { flushPrefs } from "./prefs.js";
 import "./update.js"; // avisos de actualización y de dependencias (efectos al importar)
 
 // Al resolver la tabla del idioma activo, traduce las cadenas estáticas del HTML.
 i18nReady.then(() => applyStaticI18n());
 
+// ---- Persistir el último ajuste al ocultar/cerrar ----
+// Los guardados con debounce (tamaño tras redimensionar, ancla tras reacomodo)
+// podrían perderse si la app se cierra antes de que salte su temporizador —p. ej.
+// el hook SessionEnd lanza `--quit` y el proceso sale de inmediato. Vaciamos los
+// pendientes cuando la webview se oculta a bandeja o se va a cerrar. `pagehide`
+// es más fiable que `beforeunload` en webviews; cubrimos ambos por si acaso.
+window.addEventListener("pagehide", flushPrefs);
+window.addEventListener("beforeunload", flushPrefs);
+// Cierre del backend (menú "Salir" o hook SessionEnd `--quit`): un `app.exit`
+// duro no dispara `pagehide`, así que el backend nos avisa y espera un margen
+// para que vaciemos lo pendiente a localStorage antes de terminar.
+listen("app://will-quit", () => flushPrefs());
+
 // ---- Flujo de datos ----
 listen("usage://metrics-updated", (e) => render(e.payload));
 invoke("get_metrics").then(render).catch((err) => console.error("get_metrics:", err));
-// Refresca los contadores de cuenta atrás aunque no llegue evento nuevo.
-setInterval(() => ui.lastPayload && render(ui.lastPayload), 30000);
+
+// Refresco periódico de los contadores de cuenta atrás (por si no llega evento
+// nuevo). Se PAUSA cuando la ventana se oculta en la bandeja: un widget escondido
+// no necesita repintar, y así no gastamos CPU/GPU ni batería en segundo plano. Al
+// volver a mostrarse repinta de inmediato para que la cuenta atrás no se vea
+// "congelada".
+const TICK_MS = 30000;
+let tickTimer = null;
+const tick = () => ui.lastPayload && render(ui.lastPayload);
+function startTicking() {
+  if (tickTimer) return;
+  tick(); // repinta ya al reanudar (evita el salto al volver de la bandeja)
+  tickTimer = setInterval(tick, TICK_MS);
+}
+function stopTicking() {
+  clearInterval(tickTimer);
+  tickTimer = null;
+}
+if (!document.hidden) startTicking();
+
+// Un solo handler de visibilidad: al ocultar, vacía los guardados diferidos y
+// detiene el refresco; al mostrar, reanuda el refresco.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    flushPrefs();
+    stopTicking();
+  } else {
+    startTicking();
+  }
+});
 
 // ---- Arranque ----
 (async function init() {

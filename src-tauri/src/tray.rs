@@ -205,10 +205,26 @@ pub fn toggle_window(app: &AppHandle) {
 /// `store` ya hace flush en `cleanup_before_exit`, pero forzamos un guardado
 /// explícito del store de configuración por si tuviera cambios pendientes. La usa
 /// tanto el menú "Salir" como el cierre por señal `--quit` (hook SessionEnd).
+///
+/// Las preferencias de la UI viven en `localStorage` (clave `widget-prefs`), no
+/// en este store. Algunos ajustes se guardan con DEBOUNCE (tamaño tras
+/// redimensionar, ancla tras un reacomodo): si saliéramos de inmediato, el último
+/// podría perderse. Por eso AVISAMOS al frontend (`app://will-quit`) para que
+/// vacíe lo pendiente a `localStorage` y le damos un margen breve antes de
+/// terminar, de modo que la webview alcance a persistir a disco.
 pub(crate) fn quit_clean(app: &AppHandle) {
+    use tauri::Emitter;
     use tauri_plugin_store::StoreExt;
+    let _ = app.emit("app://will-quit", ());
     if let Ok(store) = app.store("config.json") {
         let _ = store.save();
     }
-    app.exit(0);
+    // Salimos desde un hilo aparte tras un respiro: así el bucle de eventos sigue
+    // vivo y entrega `app://will-quit` (la webview vacía y persiste localStorage)
+    // antes del `exit`. El margen es corto para no demorar el cierre.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        handle.exit(0);
+    });
 }

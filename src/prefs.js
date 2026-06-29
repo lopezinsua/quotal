@@ -63,6 +63,34 @@ export const prefs = Object.assign(
 export const savePrefs = () =>
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 
+// --- Vaciado de guardados diferidos ---------------------------------------
+// Algunos ajustes se persisten con DEBOUNCE (el tamaño tras redimensionar, el
+// ancla tras un reacomodo del SO) para no escribir en cada evento. El problema:
+// si la app se cierra ANTES de que salte ese temporizador (p. ej. el hook
+// SessionEnd lanza `--quit` -> app.exit(0)), ese último ajuste se perdería.
+// Los módulos con un guardado pendiente registran aquí un "flusher"; al ocultar
+// o cerrar la ventana los vaciamos de golpe y persistimos una sola vez.
+const flushers = new Set();
+
+// Registra trabajo de guardado pendiente. Devuelve una función para des-registrar.
+export const onFlushPrefs = (fn) => {
+  flushers.add(fn);
+  return () => flushers.delete(fn);
+};
+
+// Vacía todos los flushers pendientes y persiste. Idempotente y síncrono, para
+// poder llamarlo desde `pagehide`/`beforeunload` sin depender de promesas.
+export const flushPrefs = () => {
+  for (const fn of flushers) {
+    try {
+      fn();
+    } catch (e) {
+      console.error("flushPrefs:", e);
+    }
+  }
+  savePrefs();
+};
+
 // Tamaño "completo" efectivo: el que el usuario dejó al redimensionar, o el default.
 export const fullSize = () => prefs.fullSize || SIZE_FULL_DEFAULT;
 
