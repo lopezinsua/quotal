@@ -351,6 +351,71 @@ fn remove_marked_group(settings: &mut Value, event: &str, marker: &str) {
     }
 }
 
+/// Reemplaza el `command` del hook marcado bajo `hooks.<event>` por `new_cmd`.
+/// Devuelve true si algún comando cambió de verdad (para no reescribir
+/// `settings.json` cuando no hace falta).
+fn replace_marked_command(settings: &mut Value, event: &str, marker: &str, new_cmd: &str) -> bool {
+    let Some(groups) =
+        settings.get_mut("hooks").and_then(|h| h.get_mut(event)).and_then(|s| s.as_array_mut())
+    else {
+        return false;
+    };
+    let mut changed = false;
+    for group in groups.iter_mut() {
+        let Some(hooks) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) else {
+            continue;
+        };
+        for h in hooks.iter_mut() {
+            let is_ours =
+                h.get("command").and_then(|c| c.as_str()).map(|c| c.contains(marker)).unwrap_or(false);
+            if !is_ours {
+                continue;
+            }
+            let differs =
+                h.get("command").and_then(|c| c.as_str()).map(|c| c != new_cmd).unwrap_or(true);
+            if differs {
+                if let Some(obj) = h.as_object_mut() {
+                    obj.insert("command".into(), Value::String(new_cmd.to_string()));
+                    changed = true;
+                }
+            }
+        }
+    }
+    changed
+}
+
+/// Re-sincroniza al arranque los scripts/comandos de los hooks YA instalados con
+/// la ruta ACTUAL del ejecutable. Los `.vbs` (Windows) incrustan `current_exe()`
+/// en el momento de instalar; si la app se mueve, se renombra su carpeta o se
+/// actualiza, esa ruta queda obsoleta y el hook deja de funcionar silenciosamente.
+/// Aquí, en cada arranque:
+///   - Windows: `build_*_command` REESCRIBE el `.vbs` con el exe actual (su ruta
+///     fija en `settings.json` no cambia, así que normalmente no tocamos el JSON).
+///   - Unix: el exe va en el propio comando de `settings.json`; si cambió, lo
+///     actualizamos.
+/// Esto también propaga a instalaciones antiguas la versión nueva de los scripts
+/// (p. ej. el cierre limpio con `--quit` en vez del viejo `taskkill /F`).
+/// Best-effort: cualquier fallo se ignora (no debe impedir el arranque).
+pub fn resync_installed_hooks() {
+    let mut settings = read_settings();
+    let mut changed = false;
+
+    if event_has_marker(&settings, "SessionStart", AUTOSTART_MARKER) {
+        if let Ok(cmd) = build_autostart_command() {
+            changed |= replace_marked_command(&mut settings, "SessionStart", AUTOSTART_MARKER, &cmd);
+        }
+    }
+    if event_has_marker(&settings, "SessionEnd", SHUTDOWN_MARKER) {
+        if let Ok(cmd) = build_shutdown_command() {
+            changed |= replace_marked_command(&mut settings, "SessionEnd", SHUTDOWN_MARKER, &cmd);
+        }
+    }
+
+    if changed {
+        let _ = write_atomic(&paths::settings_path(), &settings);
+    }
+}
+
 /// ¿Está instalado el auto-arranque con Claude Code?
 pub fn is_autostart_installed() -> bool {
     event_has_marker(&read_settings(), "SessionStart", AUTOSTART_MARKER)

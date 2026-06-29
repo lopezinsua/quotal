@@ -93,6 +93,11 @@ pub fn run() {
                 env!("CARGO_PKG_VERSION")
             );
             tray::create_tray(app)?;
+            // Auto-reparación de los hooks de Claude Code: re-sincroniza los
+            // scripts de auto-arranque/auto-cierre con la ruta ACTUAL del exe, por
+            // si la app se movió/renombró/actualizó desde que se instalaron (si no,
+            // apuntarían a una ruta vieja y dejarían de funcionar en silencio).
+            claude_code_bridge::resync_installed_hooks();
             poller::spawn_watchers(app.handle().clone(), shared.clone());
             poller::spawn_plan_poller(app.handle().clone(), shared.clone());
             // Auto-actualización: comprobación silenciosa en segundo plano. Si hay
