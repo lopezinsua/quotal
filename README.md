@@ -138,6 +138,46 @@ sha256sum -c SHA256SUMS.txt
 Get-FileHash .\Quotal_*_x64_en-US.msi -Algorithm SHA256
 ```
 
+## Getting started
+
+Once installed, you're up and running in a minute — no account, no config files to edit.
+
+1. **Launch Quotal.** A small widget appears, always on top. The first numbers fill in
+   as soon as it reads Claude Code's local data — usually within a few seconds.
+2. **Make sure Claude Code is set up.** Quotal reuses the OAuth token Claude Code already
+   stores locally, so just having signed in once with the CLI (`claude`) is enough. No
+   token to paste anywhere.
+3. **Position it.** Drag the widget where you like — it remembers its place and snaps to
+   screen edges. Resize it from any corner.
+4. **Pick a style (optional).** Open the settings panel with the **gear icon** on the
+   widget to switch between the desktop widget and **pill mode** (`bar` · `ring` ·
+   `minimal`), change language, or enable the tray icon.
+
+That's it. From here on the widget refreshes on its own (session usage every 60s, context
+window in real time) — you never type a command.
+
+### Open / Close with Claude Code
+
+In the settings panel you'll find two optional toggles:
+
+- **Open with Claude Code** — Quotal launches automatically whenever you start a Claude
+  Code session, so the widget is already there when you need it.
+- **Close with Claude Code** — Quotal shuts itself down when your Claude Code session ends,
+  so it's not left running in the background.
+
+**How it works (and why it's safe):** enabling a toggle adds a small `SessionStart` /
+`SessionEnd` **hook** to your Claude Code `settings.json`. The hook just runs Quotal (on
+Windows via a hidden launcher, so no console window flashes) and only if it isn't already
+running. Each hook carries a unique marker so Quotal can find exactly its own entry:
+
+- It **never touches your other hooks** — it only adds or removes its own group.
+- Turning a toggle **off** restores `settings.json` to exactly what it was before.
+- Writes are **atomic** (temp file + rename), so a crash mid-write can't corrupt your
+  settings.
+
+So the feature is fully **opt-in and reversible** — leave both off and Quotal changes
+nothing in Claude Code.
+
 ## Security
 
 > [!IMPORTANT]
