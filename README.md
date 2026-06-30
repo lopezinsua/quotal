@@ -104,6 +104,10 @@ turns that same data into something **ambient**.
 
 <img src="docs/media/pill.png" width="720" alt="Pill modes: bar, ring and minimal" />
 
+**Themes** — light & dark, plus a pickable accent color (`green` · `blue` · `violet` · `amber`).
+
+<img src="docs/media/themes.png" width="720" alt="Light and dark themes with a pickable accent color" />
+
 **Tray icon** — lives in your menu bar and changes color by severity (`normal` · `warning` · `critical`).
 
 <img src="docs/media/tray.png" width="720" alt="Tray icon severity states with popover" />
