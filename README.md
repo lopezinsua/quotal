@@ -81,6 +81,7 @@ turns that same data into something **ambient**.
 | Context window of active session (200k / 1M, model-aware) | ✅ |
 | Pill mode (bar / ring / minimal, expands on hover) | ✅ |
 | Tray icon, color by severity (normal / warning / critical) | ✅ |
+| Desktop notifications when usage nears your limit (opt-in, configurable) | ✅ |
 | Open / Close with Claude Code (optional, reversible hooks) | ✅ |
 | In-app update notifications | ✅ |
 | Remembers position & size, snaps to edges | ✅ |
@@ -266,9 +267,9 @@ git push origin v0.3.2
 - [x] In-app update notifications
 - [x] Open / Close with Claude Code
 - [x] 11 languages
+- [x] Desktop notifications on threshold (e.g. 90% used)
 - [ ] Code-signed builds (no more "unidentified developer" warning)
 - [ ] Custom themes
-- [ ] Desktop notifications on threshold (e.g. 90% used)
 
 ## FAQ
 

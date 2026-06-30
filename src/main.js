@@ -19,6 +19,7 @@ import { render } from "./render.js";
 import { applyLayout, restorePosition } from "./window.js";
 import { applyVisualPrefs } from "./controls.js";
 import { flushPrefs } from "./prefs.js";
+import { notifyFromPayload } from "./notify.js";
 import "./update.js"; // avisos de actualización y de dependencias (efectos al importar)
 
 // Al resolver la tabla del idioma activo, traduce las cadenas estáticas del HTML.
@@ -38,8 +39,14 @@ window.addEventListener("beforeunload", flushPrefs);
 listen("app://will-quit", () => flushPrefs());
 
 // ---- Flujo de datos ----
-listen("usage://metrics-updated", (e) => render(e.payload));
-invoke("get_metrics").then(render).catch((err) => console.error("get_metrics:", err));
+// Cada actualización de plan repinta y, además, alimenta el vigilante de umbral
+// (decide por su cuenta si debe lanzar una notificación de escritorio).
+function onMetrics(payload) {
+  render(payload);
+  notifyFromPayload(payload);
+}
+listen("usage://metrics-updated", (e) => onMetrics(e.payload));
+invoke("get_metrics").then(onMetrics).catch((err) => console.error("get_metrics:", err));
 
 // Refresco periódico de los contadores de cuenta atrás (por si no llega evento
 // nuevo). Se PAUSA cuando la ventana se oculta en la bandeja: un widget escondido

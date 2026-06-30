@@ -77,6 +77,9 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Notificaciones de escritorio (aviso de umbral de uso). El front decide
+        // CUÁNDO notificar; este plugin solo expone el envío al SO.
+        .plugin(tauri_plugin_notification::init())
         .manage(shared.clone())
         .setup(move |app| {
             // Si nos lanzaron solo para cerrar (`--quit`) y resultamos ser la

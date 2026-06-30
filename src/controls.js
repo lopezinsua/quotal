@@ -19,6 +19,7 @@ import {
   SUPPORTED,
 } from "./i18n.js";
 import { i18nReady } from "./boot.js";
+import { ensureNotifyPermission, rearmNotifications } from "./notify.js";
 
 // Flags locales a la interacción.
 let settingsOpen = false;
@@ -74,6 +75,8 @@ export async function applyVisualPrefs() {
   applyBorderGlow();
   el.optBorderGlow.checked = prefs.borderGlow !== false;
   el.optTrayStatic.checked = !!prefs.trayStaticColor;
+  if (el.optNotify) el.optNotify.checked = !!prefs.notifyEnabled;
+  if (el.optNotifyThreshold) el.optNotifyThreshold.value = String(prefs.notifyThreshold ?? 90);
   // Sincroniza la bandeja (backend) con la preferencia de color fijo.
   invoke("set_tray_static", { enabled: !!prefs.trayStaticColor }).catch((e) =>
     console.error("set_tray_static:", e),
@@ -203,6 +206,31 @@ el.optTrayStatic.addEventListener("change", () => {
     console.error("set_tray_static:", e),
   );
 });
+
+// Notificaciones de umbral: al activarlas pedimos permiso al SO; si se deniega,
+// revertimos el toggle (no tendría efecto). El umbral solo guarda y re-arma para
+// que el nuevo valor se respete en la próxima evaluación.
+if (el.optNotify) {
+  el.optNotify.addEventListener("change", async () => {
+    const on = el.optNotify.checked;
+    if (on) {
+      const granted = await ensureNotifyPermission();
+      if (!granted) {
+        el.optNotify.checked = false; // sin permiso, no sirve activarlo
+        return;
+      }
+    }
+    prefs.notifyEnabled = on;
+    savePrefs();
+  });
+}
+if (el.optNotifyThreshold) {
+  el.optNotifyThreshold.addEventListener("change", () => {
+    prefs.notifyThreshold = Number(el.optNotifyThreshold.value) || 90;
+    savePrefs();
+    rearmNotifications(); // respeta el nuevo umbral en la próxima actualización
+  });
+}
 
 // Estilo de píldora: cambia el indicador y, como cada estilo tiene su propio
 // tamaño de ventana, re-aplica el layout para que la píldora se reajuste en vivo

@@ -19,6 +19,9 @@ tauri-plugin-log = "2"
 # Auto-actualización: comprueba el endpoint de releases, verifica la firma
 # minisign del artefacto (clave pública en tauri.conf.json) y aplica la update.
 tauri-plugin-updater = "2"
+# Notificaciones de escritorio nativas: aviso al cruzar el umbral de uso (la
+# lógica de umbral/anti-spam vive en el frontend, que ya recibe el flujo de plan).
+tauri-plugin-notification = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

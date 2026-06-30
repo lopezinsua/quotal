@@ -52,6 +52,10 @@ export const prefs = Object.assign(
     position: null,
     // Idioma forzado por el usuario; null -> autodetección del SO.
     locale: null,
+    // Notificaciones de escritorio al cruzar el umbral de uso. Opt-in (off por
+    // defecto) y el umbral (% usado) a partir del cual avisar.
+    notifyEnabled: false,
+    notifyThreshold: 90,
     // Versión de actualización silenciada con "No mostrar más". Mientras la
     // versión disponible sea ESTA, no se muestra el aviso; al salir una más
     // nueva, vuelve a aparecer.
