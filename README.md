@@ -119,9 +119,14 @@ Grab the installer for your OS from the [latest release](https://github.com/lope
 | **Linux** | `.AppImage` or `.deb` |
 
 > [!NOTE]
-> Until the app is code-signed, your OS may warn that it's from an unidentified
-> developer. On **Windows** click *More info → Run anyway*; on **macOS** right-click
-> the app → *Open*.
+> **Why the "unidentified developer" warning?** Quotal isn't code-signed yet — a signing
+> certificate is a recurring paid subscription, and as a free MIT project it doesn't have
+> one (a free OSS certificate via SignPath is being pursued). The warning is your OS being
+> cautious about *unknown* publishers, **not** a sign anything is wrong. You can verify the
+> download yourself with the published [`SHA256SUMS.txt`](#verify-your-download), and every
+> in-app **auto-update is cryptographically signed** (see below). To run it:
+> - **Windows** — click *More info → Run anyway*.
+> - **macOS** — right-click the app → *Open* (then *Open* again).
 
 ### Verify your download
 
@@ -181,15 +186,21 @@ nothing in Claude Code.
 ## Security
 
 > [!IMPORTANT]
-> 🔒 **Your token never leaves your machine.**
+> 🔒 **Your data never leaves your machine.**
 >
-> - Quotal **never creates or stores credentials of its own** — it reuses the OAuth
->   token Claude Code already keeps locally.
-> - **No telemetry. No cloud. No external servers** (other than Anthropic's own
->   `/usage` endpoint, the same one the CLI calls).
+> - **No telemetry. No analytics. No accounts. No cloud.** Quotal makes exactly one kind
+>   of network call: to Anthropic's own `/usage` endpoint — the *same* request the Claude
+>   Code CLI already makes. Nothing is ever sent anywhere else.
+> - Quotal **never creates or stores credentials of its own** — it reuses the OAuth token
+>   Claude Code already keeps locally, and never copies it elsewhere.
+> - **Signed auto-updates.** In-app updates are verified end-to-end with a
+>   [minisign](https://jedisct1.github.io/minisign/) public key embedded in the app, so an
+>   update can only install if it was signed with the matching private key — a tampered or
+>   spoofed update is rejected automatically.
 > - Every write to `settings.json` and credential files is **atomic** (tmp + rename)
 >   and **idempotent**. Any installed hook is fully **reversible** — removing it
 >   restores your previous config exactly.
+> - **Open source (MIT).** The entire codebase is here to audit — nothing is hidden.
 
 ## How it works
 
