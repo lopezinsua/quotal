@@ -43,6 +43,16 @@ windows = { version = "0.61", features = [
     "Win32_Media",
 ] }
 
+# Dependencias SOLO de test (no entran en el binario de release). `httpmock`
+# simula los endpoints de Anthropic (`/usage` y refresco de token) para ejercitar
+# el flujo crítico de fetch/refresh sin red real; `tempfile` aísla las escrituras
+# a `.credentials.json` en un directorio temporal; `serial_test` serializa los
+# tests que tocan variables de entorno globales (HOME / QUOTAL_*_URL).
+[dev-dependencies]
+httpmock = "0.7"
+tempfile = "3"
+serial_test = "3"
+
 [lib]
 name = "quotal_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

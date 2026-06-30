@@ -16,9 +16,22 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 const OAUTH_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
-const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+const DEFAULT_TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+const DEFAULT_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA: &str = "oauth-2025-04-20";
+
+/// Endpoint de refresco de token. En producción es el de Anthropic; los tests de
+/// integración lo redirigen a un servidor local con `QUOTAL_TOKEN_URL` para
+/// ejercitar el flujo de refresco SIN tocar la red real. Cero cambio de
+/// comportamiento en producción (la env var no existe → cae a la constante).
+fn token_url() -> String {
+    std::env::var("QUOTAL_TOKEN_URL").unwrap_or_else(|_| DEFAULT_TOKEN_URL.to_string())
+}
+
+/// Endpoint de uso (`/usage`). Override por `QUOTAL_USAGE_URL` solo para tests.
+fn usage_url() -> String {
+    std::env::var("QUOTAL_USAGE_URL").unwrap_or_else(|_| DEFAULT_USAGE_URL.to_string())
+}
 const USER_AGENT: &str = concat!("quotal/", env!("CARGO_PKG_VERSION"));
 
 /// Bloque de plan que viaja al frontend. `available=false` + `error` cuando no
@@ -170,6 +183,16 @@ fn token_cache() -> &'static Mutex<Option<Tokens>> {
 fn store_cache(t: &Tokens) {
     if let Ok(mut c) = token_cache().lock() {
         *c = Some(t.clone());
+    }
+}
+
+/// Vacía la caché de tokens en memoria. SOLO para tests: la caché es un `static`
+/// compartido por todo el binario de test, así que hay que resetearla entre casos
+/// para que el token refrescado en uno no contamine al siguiente.
+#[cfg(test)]
+pub(crate) fn reset_token_cache_for_test() {
+    if let Ok(mut c) = token_cache().lock() {
+        *c = None;
     }
 }
 
@@ -351,7 +374,7 @@ async fn refresh_token(client: &reqwest::Client, refresh: &str) -> Result<Tokens
         "client_id": OAUTH_CLIENT_ID,
     });
     let resp = client
-        .post(TOKEN_URL)
+        .post(token_url())
         .header("Content-Type", "application/json")
         .header("User-Agent", USER_AGENT)
         .json(&body)
@@ -498,7 +521,7 @@ fn persist_tokens(access: &str, refresh: &str, expires_at_ms: i64) {
 
 async fn get_usage(client: &reqwest::Client, token: &str) -> Result<reqwest::Response, String> {
     client
-        .get(USAGE_URL)
+        .get(usage_url())
         .header("Authorization", format!("Bearer {token}"))
         .header("anthropic-beta", OAUTH_BETA)
         .header("User-Agent", USER_AGENT)
@@ -845,5 +868,136 @@ mod tests {
         assert!(usage_drift(&vacio).is_some()); // 200 sin nada reconocible -> deriva
         let con_sesion = PlanInfo { session_percent: Some(10.0), ..Default::default() };
         assert!(usage_drift(&con_sesion).is_none());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests de INTEGRACIÓN del flujo fetch/refresh. Ejercitan el camino que puede
+// romper el login del usuario (GET /usage, refresco de token, reescritura de
+// `.credentials.json`) contra un servidor HTTP SIMULADO (`httpmock`) y un HOME
+// temporal — nunca tocan la red ni el `.claude` real.
+//
+// Tocan estado GLOBAL del proceso (env vars + la caché estática de tokens), así
+// que van con `#[serial]` y resetean la caché en cada caso.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod net_tests {
+    use super::*;
+    use httpmock::prelude::*;
+    use serde_json::json;
+    use serial_test::serial;
+    use std::path::Path;
+
+    /// Apunta HOME/USERPROFILE a `dir` y escribe ahí un `.credentials.json` con
+    /// el blob `claudeAiOauth` que espera el parser.
+    fn setup_home(dir: &Path, access: &str, refresh: &str, expires_at_ms: i64) {
+        std::env::set_var("HOME", dir);
+        std::env::set_var("USERPROFILE", dir);
+        let claude = dir.join(".claude");
+        std::fs::create_dir_all(&claude).unwrap();
+        let blob = json!({
+            "claudeAiOauth": {
+                "accessToken": access,
+                "refreshToken": refresh,
+                "expiresAt": expires_at_ms,
+                "subscriptionType": "pro"
+            }
+        });
+        std::fs::write(claude.join(".credentials.json"), blob.to_string()).unwrap();
+    }
+
+    /// Limpia las env vars que el test inyecta (para no filtrar a otros tests).
+    fn teardown() {
+        for k in ["QUOTAL_USAGE_URL", "QUOTAL_TOKEN_URL", "HOME", "USERPROFILE"] {
+            std::env::remove_var(k);
+        }
+        reset_token_cache_for_test();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn fetch_happy_path_online() {
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        // Token aún válido (caduca dentro de 1h) → no hay refresco proactivo.
+        setup_home(tmp.path(), "acc-valid", "ref", now_ms() + 3_600_000);
+
+        let server = MockServer::start_async().await;
+        let usage = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-valid");
+                then.status(200).json_body(json!({
+                    "five_hour": { "utilization": 42.0, "resets_at": "2026-07-01T10:00:00Z" },
+                    "seven_day": { "utilization": 12.0, "resets_at": "2026-07-05T10:00:00Z" }
+                }));
+            })
+            .await;
+        std::env::set_var("QUOTAL_USAGE_URL", server.url("/usage"));
+
+        let info = fetch().await;
+
+        usage.assert_async().await;
+        assert!(info.available, "debería estar disponible; error={:?}", info.error);
+        assert_eq!(info.name, "Pro");
+        assert_eq!(info.session_percent, Some(42.0));
+        assert_eq!(info.weekly_percent, Some(12.0));
+        assert_eq!(info.source.as_deref(), Some("online"));
+
+        teardown();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn fetch_refresca_en_401_y_reintenta() {
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        // Caduca dentro de 1h → NO refresco proactivo: forzamos el camino del 401.
+        setup_home(tmp.path(), "acc-expired", "ref-1", now_ms() + 3_600_000);
+
+        let server = MockServer::start_async().await;
+        // 1) Primer GET con el token viejo → 401.
+        let usage_401 = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-expired");
+                then.status(401);
+            })
+            .await;
+        // 2) Refresco → token nuevo + refresh rotado.
+        let token = server
+            .mock_async(|when, then| {
+                when.method(POST).path("/token");
+                then.status(200).json_body(json!({
+                    "access_token": "acc-new",
+                    "refresh_token": "ref-2",
+                    "expires_in": 3600
+                }));
+            })
+            .await;
+        // 3) Reintento del GET con el token nuevo → 200.
+        let usage_ok = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-new");
+                then.status(200)
+                    .json_body(json!({ "five_hour": { "utilization": 5.0, "resets_at": "x" } }));
+            })
+            .await;
+        std::env::set_var("QUOTAL_USAGE_URL", server.url("/usage"));
+        std::env::set_var("QUOTAL_TOKEN_URL", server.url("/token"));
+
+        let info = fetch().await;
+
+        usage_401.assert_async().await;
+        token.assert_async().await;
+        usage_ok.assert_async().await;
+        assert!(info.available, "debería recuperarse tras el refresco; error={:?}", info.error);
+        assert_eq!(info.session_percent, Some(5.0));
+
+        // Write-back con CAS: el fichero de credenciales debe quedar con el token
+        // nuevo y el refresh rotado (preservando el resto del blob).
+        let creds = std::fs::read_to_string(tmp.path().join(".claude/.credentials.json")).unwrap();
+        assert!(creds.contains("acc-new"), "el access token nuevo no se persistió: {creds}");
+        assert!(creds.contains("ref-2"), "el refresh rotado no se persistió: {creds}");
+
+        teardown();
     }
 }
