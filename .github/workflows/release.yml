@@ -144,3 +144,29 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Checksums SHA-256 (gratis, sin certificados). Tras compilar las 3 plataformas,
+  # descarga los instaladores del release (draft) y publica un SHA256SUMS.txt para
+  # que el usuario verifique la integridad de su descarga:
+  #   sha256sum -c SHA256SUMS.txt        (Linux/macOS)
+  #   certutil -hashfile <archivo> SHA256 (Windows)
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.0.0-{0}', github.run_number) }}
+    steps:
+      - name: Generar y publicar SHA256SUMS.txt
+        run: |
+          mkdir -p dist && cd dist
+          # Descarga solo los instaladores (no .sig/.json) del release draft.
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir . \
+            -p '*.msi' -p '*.exe' -p '*.dmg' -p '*.AppImage' -p '*.deb' -p '*.rpm' -p '*.app.tar.gz'
+          # SHA256SUMS.txt no empieza por "Quotal", así que el glob no se autoincluye.
+          sha256sum Quotal* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

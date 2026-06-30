@@ -123,6 +123,21 @@ Grab the installer for your OS from the [latest release](https://github.com/lope
 > developer. On **Windows** click *More info → Run anyway*; on **macOS** right-click
 > the app → *Open*.
 
+### Verify your download
+
+Every release ships a **`SHA256SUMS.txt`**. Confirm your installer hasn't been
+tampered with before running it:
+
+```bash
+# Linux / macOS — checks every file listed in the manifest
+sha256sum -c SHA256SUMS.txt
+```
+
+```powershell
+# Windows — hash your file and compare it against the line in SHA256SUMS.txt
+Get-FileHash .\Quotal_*_x64_en-US.msi -Algorithm SHA256
+```
+
 ## Security
 
 > [!IMPORTANT]
