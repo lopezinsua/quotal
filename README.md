@@ -222,13 +222,13 @@ flowchart TD
     end
 
     subgraph Online["Plan pipeline · every 60s"]
-        O[Local OAuth token] --> U[/api/oauth/usage]
+        O[Local OAuth token] --> U["/api/oauth/usage"]
         U --> R[Refresh + atomic write-back]
     end
 
     CC --> T
     CC --> O
-    W --> B[Quotal backend · Rust/Tokio]
+    W --> B["Quotal backend · Rust/Tokio"]
     R --> B
     B --> C[(Cache · last good value)]
     B --> G[Desktop widget]
