@@ -49,16 +49,21 @@ pub fn create_tray(app: &App<Wry>) -> tauri::Result<()> {
             "quit" => quit_clean(app),
             _ => {}
         })
-        .on_tray_icon_event(|tray, event| {
-            // Click izquierdo en el icono también alterna la visibilidad.
-            if let TrayIconEvent::Click {
+        .on_tray_icon_event(|tray, event| match event {
+            // Click izquierdo en el icono: alterna la visibilidad.
+            TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
-            } = event
-            {
-                toggle_window(tray.app_handle());
-            }
+            } => toggle_window(tray.app_handle()),
+            // Click derecho: abre el menú nativo. Re-verificamos el texto del ítem
+            // con la visibilidad REAL justo antes, por si la ventana se ocultó por
+            // otra vía (la X del widget) sin pasar por toggle_window.
+            TrayIconEvent::Click {
+                button: MouseButton::Right,
+                ..
+            } => sync_toggle_label(tray.app_handle()),
+            _ => {}
         });
 
     // Icono inicial: el PNG de bandeja embebido (es lo correcto: la bandeja
@@ -177,6 +182,19 @@ pub fn set_gauge(app: &AppHandle, remaining: Option<f64>, severity: &str, toolti
     let _ = tray.set_tooltip(Some(tooltip));
 }
 
+/// Sincroniza el texto del ítem de bandeja con la visibilidad REAL de la ventana
+/// (Ocultar si está visible, Mostrar si no). Es la fuente de verdad: cualquier
+/// vía que muestre u oculte la ventana debe llamarla (o pasar por
+/// `toggle_window`) para que el menú no se desincronice — p. ej. la X del widget,
+/// que oculta a la bandeja sin alternar desde aquí.
+pub fn sync_toggle_label(app: &AppHandle) {
+    let visible =
+        app.get_webview_window("main").and_then(|w| w.is_visible().ok()).unwrap_or(false);
+    if let Some(state) = app.try_state::<TrayState>() {
+        let _ = state.toggle.set_text(if visible { HIDE_TEXT } else { SHOW_TEXT });
+    }
+}
+
 /// Alterna mostrar/ocultar la ventana principal y sincroniza el texto del
 /// menú de bandeja + un evento para el frontend.
 pub fn toggle_window(app: &AppHandle) {
@@ -193,9 +211,7 @@ pub fn toggle_window(app: &AppHandle) {
     }
     let now_visible = !visible;
 
-    if let Some(state) = app.try_state::<TrayState>() {
-        let _ = state.toggle.set_text(if now_visible { HIDE_TEXT } else { SHOW_TEXT });
-    }
+    sync_toggle_label(app);
 
     use tauri::Emitter;
     let _ = app.emit("window://visibility-changed", serde_json::json!({ "visible": now_visible }));

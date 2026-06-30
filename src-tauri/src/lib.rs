@@ -125,6 +125,7 @@ pub fn run() {
             commands::install_statusline_bridge,
             commands::uninstall_statusline_bridge,
             commands::set_tray_static,
+            commands::hide_to_tray,
             commands::set_bounds,
             commands::animate_bounds,
             commands::get_config,

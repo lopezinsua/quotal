@@ -464,7 +464,11 @@ el.refreshBtn.addEventListener("click", async () => {
   }
 });
 
-el.hideBtn.addEventListener("click", () => win.hide());
+// Ocultar a la bandeja: lo hace el backend para que, de paso, sincronice el
+// texto del menú de bandeja (Mostrar/Ocultar) con el estado real de la ventana.
+el.hideBtn.addEventListener("click", () => {
+  invoke("hide_to_tray").catch((e) => console.error("hide_to_tray:", e));
+});
 
 // ---- Tirador de redimensionado ----
 // Al pulsar el agarre de la esquina, window.js conduce el resize con la

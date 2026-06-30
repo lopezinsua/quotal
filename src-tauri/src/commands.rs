@@ -112,6 +112,20 @@ pub fn uninstall_statusline_bridge() -> Result<(), String> {
     claude_code_bridge::uninstall_statusline_bridge()
 }
 
+/// Oculta el widget a la bandeja (botón X de la barra del widget) y sincroniza
+/// el texto del menú de bandeja con la visibilidad real. Antes la X ocultaba la
+/// ventana directamente desde el frontend (`win.hide()`), sin pasar por la
+/// bandeja, así que el menú se quedaba en "Ocultar widget" estando ya oculto.
+#[tauri::command]
+pub fn hide_to_tray(app: AppHandle) {
+    use tauri::{Emitter, Manager};
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.hide();
+    }
+    crate::tray::sync_toggle_label(&app);
+    let _ = app.emit("window://visibility-changed", serde_json::json!({ "visible": false }));
+}
+
 /// Activa/desactiva el color fijo del icono de bandeja y lo redibuja al instante
 /// con el plan actual (sin esperar al próximo sondeo).
 #[tauri::command]
