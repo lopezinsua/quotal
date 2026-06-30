@@ -68,5 +68,14 @@
   "deps_hint": "इन्हें इससे इंस्टॉल करें:",
   "deps_copy": "कमांड कॉपी करें",
   "deps_copied": "कॉपी किया गया",
+  "opt_theme": "थीम",
+  "theme_dark": "गहरा",
+  "theme_light": "हल्का",
+  "opt_accent": "एक्सेंट रंग",
+  "accent_default": "डिफ़ॉल्ट",
+  "accent_green": "हरा",
+  "accent_blue": "नीला",
+  "accent_violet": "बैंगनी",
+  "accent_amber": "एम्बर",
   "_auto": "स्वचालित"
 }

@@ -68,5 +68,14 @@
   "deps_hint": "ثبّتها باستخدام:",
   "deps_copy": "نسخ الأمر",
   "deps_copied": "تم النسخ",
+  "opt_theme": "السمة",
+  "theme_dark": "داكن",
+  "theme_light": "فاتح",
+  "opt_accent": "لون التمييز",
+  "accent_default": "افتراضي",
+  "accent_green": "أخضر",
+  "accent_blue": "أزرق",
+  "accent_violet": "بنفسجي",
+  "accent_amber": "كهرماني",
   "_auto": "تلقائي"
 }

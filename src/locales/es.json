@@ -76,5 +76,14 @@
   "deps_hint": "Instálalas con:",
   "deps_copy": "Copiar comando",
   "deps_copied": "Copiado",
+  "opt_theme": "Tema",
+  "theme_dark": "Oscuro",
+  "theme_light": "Claro",
+  "opt_accent": "Color de acento",
+  "accent_default": "Predeterminado",
+  "accent_green": "Verde",
+  "accent_blue": "Azul",
+  "accent_violet": "Violeta",
+  "accent_amber": "Ámbar",
   "_auto": "Automático"
 }

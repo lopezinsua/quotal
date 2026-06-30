@@ -80,6 +80,7 @@ turns that same data into something **ambient**.
 | Reset times (same as `/usage`) | ✅ |
 | Context window of active session (200k / 1M, model-aware) | ✅ |
 | Pill mode (bar / ring / minimal, expands on hover) | ✅ |
+| Light & dark themes + pickable accent color | ✅ |
 | Tray icon, color by severity (normal / warning / critical) | ✅ |
 | Desktop notifications when usage nears your limit (opt-in, configurable) | ✅ |
 | Open / Close with Claude Code (optional, reversible hooks) | ✅ |
@@ -106,6 +107,10 @@ turns that same data into something **ambient**.
 **Tray icon** — lives in your menu bar and changes color by severity (`normal` · `warning` · `critical`).
 
 <img src="docs/media/tray.png" width="720" alt="Tray icon severity states with popover" />
+
+**Desktop notifications** — an opt-in heads-up the moment your session or weekly usage crosses your threshold.
+
+<img src="docs/media/desktop-notifications.png" width="720" alt="Desktop notification when usage nears the limit" />
 
 </div>
 
@@ -268,8 +273,8 @@ git push origin v0.3.2
 - [x] Open / Close with Claude Code
 - [x] 11 languages
 - [x] Desktop notifications on threshold (e.g. 90% used)
+- [x] Light & dark themes + accent color
 - [ ] Code-signed builds (no more "unidentified developer" warning)
-- [ ] Custom themes
 
 ## FAQ
 

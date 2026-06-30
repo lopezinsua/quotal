@@ -68,5 +68,14 @@
   "deps_hint": "Установите их командой:",
   "deps_copy": "Копировать команду",
   "deps_copied": "Скопировано",
+  "opt_theme": "Тема",
+  "theme_dark": "Тёмная",
+  "theme_light": "Светлая",
+  "opt_accent": "Акцентный цвет",
+  "accent_default": "По умолчанию",
+  "accent_green": "Зелёный",
+  "accent_blue": "Синий",
+  "accent_violet": "Фиолетовый",
+  "accent_amber": "Янтарный",
   "_auto": "Авто"
 }

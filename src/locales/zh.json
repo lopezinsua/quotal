@@ -68,5 +68,14 @@
   "deps_hint": "使用以下命令安装：",
   "deps_copy": "复制命令",
   "deps_copied": "已复制",
+  "opt_theme": "主题",
+  "theme_dark": "深色",
+  "theme_light": "浅色",
+  "opt_accent": "强调色",
+  "accent_default": "默认",
+  "accent_green": "绿色",
+  "accent_blue": "蓝色",
+  "accent_violet": "紫色",
+  "accent_amber": "琥珀色",
   "_auto": "自动"
 }

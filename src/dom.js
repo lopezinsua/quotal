@@ -37,6 +37,8 @@ export const el = {
   optOnTop: document.getElementById("opt-on-top"),
   optCollapsed: document.getElementById("opt-collapsed"),
   optPillStyle: document.getElementById("opt-pill-style"),
+  optTheme: document.getElementById("opt-theme"),
+  optAccent: document.getElementById("opt-accent"),
   optShowContext: document.getElementById("opt-show-context"),
   optRememberPos: document.getElementById("opt-remember-pos"),
   optAutostart: document.getElementById("opt-autostart"),

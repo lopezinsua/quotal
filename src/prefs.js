@@ -38,6 +38,11 @@ export const prefs = Object.assign(
     showContext: true,
     // Estilo de la píldora colapsada: "bar" | "ring" | "minimal".
     pillStyle: DEFAULT_PILL_STYLE,
+    // Tema del widget: "dark" (default) | "light".
+    theme: "dark",
+    // Color de acento (barra de sesión + píldora): "default" (sage del CSS) |
+    // "green" | "blue" | "violet" | "amber".
+    accent: "default",
     // Colores del borde por estado. Cada clave: hex personalizado o null (=CSS).
     borderColors: { normal: null, warn: null, crit: null },
     // Iluminar el borde de la ventana según la severidad (aviso/crítico)?

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  html, body { margin: 0; background: #050506; }
+  .qw, .qw *, .qw *::before, .qw *::after { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  .qw {
+    --bg-top:#17171b; --bg-bot:#0f0f12; --fg:#f5f5f7; --body:#c9c9cd; --muted:#8a8a90; --faint:#66676c;
+    --line:rgba(255,255,255,0.08); --track:rgba(255,255,255,0.06);
+    --state-ok:oklch(0.76 0.05 162); --state-warn:#ffc533; --state-crit:#ff5d5d;
+    --weekly-ok:oklch(0.66 0.05 264); --green:#59d499;
+    --accent:var(--green); --state:var(--state-ok);
+    position:relative; width:248px; background:linear-gradient(180deg,var(--bg-top),var(--bg-bot));
+    border-radius:14px; border:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden;
+    font-family:"Segoe UI Variable Display","Segoe UI",-apple-system,system-ui,sans-serif; -webkit-font-smoothing:antialiased; color:var(--fg);
+  }
+  .qw .bar{ display:flex; align-items:center; justify-content:space-between; padding:9px 9px 7px 13px; }
+  .qw .title{ font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); }
+  .qw .actions{ display:flex; gap:1px; }
+  .qw .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:transparent; border:none; color:var(--muted); border-radius:6px; }
+  .qw .body{ flex:1; display:flex; flex-direction:column; gap:9px; padding:3px 13px 11px; }
+  .qw .dot{ width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
+  .qw .plan-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .qw .plan-name{ font-size:14px; font-weight:650; letter-spacing:-.01em; color:var(--fg); }
+  .qw .plan-sub{ font-size:8.5px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); }
+  .qw .usage-block{ display:flex; flex-direction:column; }
+  .qw .usage-block.hero{ position:relative; padding:8px 11px 10px; border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018)); border:1px solid var(--line); box-shadow:inset 0 1px 0 rgba(255,255,255,.06); overflow:hidden; }
+  .qw .usage-row{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; position:relative; z-index:1; }
+  .qw .usage-name{ font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); white-space:nowrap; }
+  .qw .hero .usage-name{ flex:none; }
+  .qw .hero .usage-reset{ font-size:9px; color:var(--faint); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+  .qw .hero .usage-pct{ position:relative; z-index:1; display:block; margin:2px 0 9px; font-size:24px; font-weight:600; line-height:1; letter-spacing:-.02em; color:var(--fg); font-variant-numeric:tabular-nums; }
+  .qw .sparkline{ position:absolute; left:0; right:0; top:22px; width:100%; height:40px; z-index:0; color:var(--state); opacity:.34; pointer-events:none; }
+  .qw .progress-track{ position:relative; width:100%; height:5px; background:var(--track); border-radius:999px; overflow:hidden; box-shadow:inset 0 1px 1.5px rgba(0,0,0,.3); z-index:1; }
+  .qw .progress-fill{ height:100%; border-radius:999px; background-color:var(--fill,var(--state-ok)); box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
+  .qw .progress-fill.session{ --fill:var(--state-ok); }
+  .qw .progress-fill.weekly{ --fill:var(--weekly-ok); }
+  .qw .usage-block.compact{ gap:5px; border-top:1px solid var(--line); padding-top:9px; }
+  .qw .usage-block.compact .usage-name{ text-transform:none; font-size:11px; font-weight:500; letter-spacing:.01em; color:var(--body); }
+  .qw .usage-pct{ font-size:12px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums; flex:none; white-space:nowrap; }
+  .qw .usage-foot{ display:flex; align-items:baseline; justify-content:space-between; font-size:9.5px; color:var(--faint); }
+  .qw .context-line{ display:flex; align-items:center; gap:7px; border-top:1px solid var(--line); padding-top:9px; font-size:11px; }
+  .qw .context-label{ color:var(--body); white-space:nowrap; }
+  .qw .context-pct{ margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); flex:none; white-space:nowrap; }
+  .qw .freshness{ font-size:9px; color:var(--faint); text-align:right; margin-top:auto; letter-spacing:.02em; padding-right:3px; }
+  .tg{ transform:rotate(-90deg); }
+  .tg .t{ fill:none; stroke:rgba(255,255,255,.22); stroke-width:4; }
+  .tg .a{ fill:none; stroke-width:4; stroke-linecap:round; }
+</style>
+</helmet>
+
+<div style="position:relative; width:1200px; height:560px; overflow:hidden;
+      background:radial-gradient(120% 80% at 80% 0%, #1a2233 0%, #0b0c10 50%, #050506 100%);
+      font-family:'SF Pro Text','Segoe UI',-apple-system,system-ui,sans-serif; color:#f5f5f7;">
+
+  <!-- macOS menu bar -->
+  <div style="position:absolute; top:0; left:0; right:0; height:38px; display:flex; align-items:center; justify-content:space-between;
+        padding:0 16px; background:rgba(22,23,28,.72); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+        border-bottom:1px solid rgba(255,255,255,.07); font-size:13.5px; color:#d6d7db;">
+    <div style="display:flex; align-items:center; gap:20px;">
+      <span style="display:inline-flex; width:15px; height:15px; align-items:center; justify-content:center; color:#e8e8ec;">
+        <svg width="14" height="16" viewBox="0 0 14 16" fill="currentColor"><path d="M9.6 0c.1.9-.25 1.78-.8 2.4-.57.66-1.5 1.17-2.4 1.1-.12-.86.3-1.76.82-2.34C7.82.5 8.8.05 9.6 0zM12 11.7c-.43 1-.64 1.45-1.2 2.33-.78 1.23-1.88 2.76-3.24 2.77-1.2.01-1.52-.78-3.16-.77-1.64.01-1.98.79-3.2.78-1.36-.01-2.4-1.4-3.18-2.62C-.9 11.2-1.1 7.27.92 5.18c.72-.76 1.66-1.24 2.68-1.24 1.3 0 2.12.78 3.18.78 1.04 0 1.66-.78 3.18-.78.9 0 1.86.43 2.55 1.18-2.24 1.23-1.88 4.42.49 5.4z" transform="translate(1,0)"></path></svg>
+      </span>
+      <span style="font-weight:700; color:#f5f5f7;">Code</span>
+      <span style="color:#bcbdc2;">File</span>
+      <span style="color:#bcbdc2;">Edit</span>
+      <span style="color:#bcbdc2;">Selection</span>
+      <span style="color:#bcbdc2;">View</span>
+      <span style="color:#bcbdc2;">Go</span>
+      <span style="color:#bcbdc2;">Run</span>
+      <span style="color:#bcbdc2;">Terminal</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px; color:#cfd0d5;">
+      <!-- Quotal tray icon — CRITICAL state -->
+      <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; margin:0 -2px; border-radius:7px;">
+        <svg width="17" height="17" viewBox="0 0 36 36" class="tg">
+          <circle class="t" cx="18" cy="18" r="14"></circle>
+          <circle class="a" cx="18" cy="18" r="14" style="stroke:#ff5d5d; stroke-dasharray:81 88; filter:drop-shadow(0 0 3px rgba(255,93,93,.7));"></circle>
+        </svg>
+        <span style="font-size:12px; font-weight:600; color:#ff7a7a; font-variant-numeric:tabular-nums;">92%</span>
+      </span>
+      <!-- battery -->
+      <svg width="26" height="14" viewBox="0 0 26 14" fill="none"><rect x="1" y="2.5" width="20" height="9" rx="2.5" stroke="#cfd0d5" stroke-width="1.1"></rect><rect x="2.6" y="4.1" width="13" height="5.8" rx="1" fill="#cfd0d5"></rect><rect x="22.4" y="5" width="1.6" height="4" rx="0.8" fill="#cfd0d5"></rect></svg>
+      <!-- wifi -->
+      <svg width="17" height="13" viewBox="0 0 17 13" fill="#cfd0d5"><path d="M8.5 2C5.4 2 2.6 3.2.5 5.2l1.5 1.5C3.7 5 6 4 8.5 4s4.8 1 6.5 2.7L16.5 5.2C14.4 3.2 11.6 2 8.5 2z"></path><path d="M8.5 6.2c-1.7 0-3.3.7-4.5 1.8l1.6 1.6c.8-.7 1.8-1.1 2.9-1.1s2.1.4 2.9 1.1l1.6-1.6C11.8 6.9 10.2 6.2 8.5 6.2z"></path><circle cx="8.5" cy="11" r="1.6"></circle></svg>
+      <span style="font-weight:500; color:#e8e8ec;">Fri 9:41</span>
+    </div>
+  </div>
+
+  <!-- Caption — left -->
+  <div style="position:absolute; left:80px; top:104px;">
+    <div style="font-size:13px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#7c7e86;">Desktop notifications</div>
+    <div style="margin-top:10px; font-size:21px; font-weight:550; letter-spacing:-.01em; color:#e8e8ec; max-width:340px; line-height:1.4;">A heads-up the moment you're near your limit</div>
+  </div>
+
+  <!-- Widget — CRITICAL state, floating ~1.6× -->
+  <div style="position:absolute; left:510px; top:62px; transform:scale(1.6); transform-origin:top left;
+        filter:drop-shadow(0 0 28px rgba(255,93,93,.10)) drop-shadow(0 30px 60px rgba(0,0,0,.72));">
+    <div class="qw" style="--state:var(--state-crit);">
+      <header class="bar">
+        <span class="title">Quotal</span>
+        <div class="actions">
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="16" x2="12" y2="22"></line><path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+      </header>
+      <section class="body">
+        <div class="plan-head">
+          <span class="plan-name">Pro</span>
+          <span class="plan-sub">Plan usage limits</span>
+        </div>
+        <!-- Hero: session 92% CRITICAL -->
+        <div class="usage-block hero">
+          <svg class="sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" points="0,22 14,20 29,18 43,15 57,11 71,7 86,5 100,2"></polyline>
+          </svg>
+          <div class="usage-row">
+            <span class="usage-name">Current session</span>
+            <span class="usage-reset">in 0h 24m</span>
+          </div>
+          <span class="usage-pct">92% used</span>
+          <div class="progress-track">
+            <div class="progress-fill session" style="width:92%; background-color:#ff5d5d;"></div>
+          </div>
+        </div>
+        <!-- Compact: weekly 71% amber -->
+        <div class="usage-block compact">
+          <div class="usage-row">
+            <span class="usage-name">Weekly · all models</span>
+            <span class="usage-pct">71% used</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill weekly" style="width:71%; background-color:#ffc533;"></div>
+          </div>
+          <div class="usage-foot"><span class="usage-reset">Mon 09:00</span></div>
+        </div>
+        <div class="context-line">
+          <span class="dot" style="background:#59d499; box-shadow:0 0 0 3px color-mix(in srgb,#59d499 18%,transparent);"></span>
+          <span class="context-label">Context · 200k</span>
+          <span class="context-pct">82% · 164k</span>
+        </div>
+        <p class="freshness">Updated just now</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- macOS Sonoma notification — top right -->
+  <div style="position:absolute; right:16px; top:48px; width:352px; z-index:20;
+        background:rgba(34,34,40,.93); backdrop-filter:blur(32px) saturate(180%); -webkit-backdrop-filter:blur(32px) saturate(180%);
+        border:1px solid rgba(255,255,255,.13); border-radius:15px;
+        box-shadow:0 2px 0 rgba(255,255,255,.05) inset, 0 10px 40px rgba(0,0,0,.55), 0 1px 8px rgba(0,0,0,.4);
+        padding:13px 14px 14px;">
+    <div style="display:flex; align-items:flex-start; gap:11px;">
+      <!-- App icon: Quotal ring -->
+      <div style="width:46px; height:46px; border-radius:11px; flex:none;
+            background:linear-gradient(160deg,#1e1f25,#13131a);
+            border:1px solid rgba(255,255,255,.1);
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 2px 8px rgba(0,0,0,.4);">
+        <svg width="32" height="32" viewBox="0 0 36 36" style="transform:rotate(-90deg);">
+          <circle fill="none" stroke="rgba(255,255,255,.18)" stroke-width="4" cx="18" cy="18" r="14"></circle>
+          <circle fill="none" stroke="#59d499" stroke-width="4.5" stroke-linecap="round" cx="18" cy="18" r="14"
+                  style="stroke-dasharray:81 88; filter:drop-shadow(0 0 4px rgba(89,212,153,.55));"></circle>
+        </svg>
+      </div>
+      <!-- Notification text -->
+      <div style="flex:1; min-width:0; padding-top:1px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:6px; margin-bottom:3px;">
+          <span style="font-size:12px; font-weight:600; color:#e2e2e8; letter-spacing:.008em; font-family:-apple-system,system-ui,sans-serif;">Quotal</span>
+          <span style="font-size:11px; color:#7a7a84; flex:none; font-family:-apple-system,system-ui,sans-serif;">now</span>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:1.42; color:#bbbbc4; font-family:-apple-system,system-ui,sans-serif; text-wrap:pretty;">Your Claude session is at 92% used.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

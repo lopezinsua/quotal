@@ -68,5 +68,14 @@
   "deps_hint": "Installiere sie mit:",
   "deps_copy": "Befehl kopieren",
   "deps_copied": "Kopiert",
+  "opt_theme": "Design",
+  "theme_dark": "Dunkel",
+  "theme_light": "Hell",
+  "opt_accent": "Akzentfarbe",
+  "accent_default": "Standard",
+  "accent_green": "Grün",
+  "accent_blue": "Blau",
+  "accent_violet": "Violett",
+  "accent_amber": "Bernstein",
   "_auto": "Automatisch"
 }

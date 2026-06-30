@@ -20,6 +20,7 @@ import {
 } from "./i18n.js";
 import { i18nReady } from "./boot.js";
 import { ensureNotifyPermission, rearmNotifications } from "./notify.js";
+import { applyTheme, applyAccent, theme, accent } from "./theme.js";
 
 // Flags locales a la interacción.
 let settingsOpen = false;
@@ -71,6 +72,10 @@ export async function applyVisualPrefs() {
   el.optShowContext.checked = prefs.showContext;
   el.optRememberPos.checked = prefs.rememberPosition;
   applyPillStyle();
+  applyTheme(el.card, prefs.theme);
+  applyAccent(el.card, prefs.accent);
+  if (el.optTheme) el.optTheme.value = theme(prefs.theme);
+  if (el.optAccent) el.optAccent.value = accent(prefs.accent);
   applyBorderColors();
   applyBorderGlow();
   el.optBorderGlow.checked = prefs.borderGlow !== false;
@@ -244,6 +249,24 @@ if (el.optPillStyle) {
     // relleno actual al instante, sin esperar al próximo sondeo.
     if (ui.lastPayload) render(ui.lastPayload);
     applyLayout();
+  });
+}
+
+// Tema claro/oscuro: solo conmuta la clase del CSS en la tarjeta (sin relayout).
+if (el.optTheme) {
+  el.optTheme.addEventListener("change", () => {
+    prefs.theme = el.optTheme.value;
+    savePrefs();
+    applyTheme(el.card, prefs.theme);
+  });
+}
+// Color de acento: idem, conmuta accent-* (la barra de sesión y la píldora lo
+// recogen vía variables CSS al instante, sin repintar el dato).
+if (el.optAccent) {
+  el.optAccent.addEventListener("change", () => {
+    prefs.accent = el.optAccent.value;
+    savePrefs();
+    applyAccent(el.card, prefs.accent);
   });
 }
 

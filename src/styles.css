@@ -59,6 +59,67 @@
   --border-crit: rgba(255, 93, 93, 0.7);
 }
 
+/* ============================================================
+   COLOR DE ACENTO  (opt-in, .card.accent-*)
+   Sustituye el verde "ok" desaturado por un color vivo en la barra de SESIÓN
+   y en la píldora (los tres estilos). Re-declara --state para que se re-resuelva
+   con el nuevo --state-ok; va ANTES de .source-*/.sev-* (misma especificidad,
+   ganan los de más abajo) para que "sin datos" siga neutro y aviso/crítico
+   sigan mandando. El punto de fuente (--accent) NO se toca: sigue indicando el
+   origen del dato. Por defecto no hay clase -> se mantiene el sage del CSS. */
+.card.accent-green  { --state-ok: #59d499; --state: var(--state-ok); }
+.card.accent-blue   { --state-ok: #57c1ff; --state: var(--state-ok); }
+.card.accent-violet { --state-ok: #a78bfa; --state: var(--state-ok); }
+.card.accent-amber  { --state-ok: #ffc533; --state: var(--state-ok); }
+
+/* ============================================================
+   TEMA CLARO  (opt-in, .card.theme-light)
+   Reescribe SOLO la escalera de superficies/texto/hairlines a una paleta clara.
+   Los colores de estado (ok/warn/crit), el verde de marca y el slate semanal se
+   conservan idénticos: la señal de alarma se lee igual en ambos temas. Además
+   ajusta los pocos puntos con blanco LITERAL que no salen de un token (el velo
+   del bloque héroe, el cristal translúcido, el menú de idioma, la pista del
+   anillo de la píldora). Por defecto no hay clase -> tema oscuro del CSS. */
+.card.theme-light {
+  --bg-top: #f5f5f8;
+  --bg-bot: #ebebee;
+  --surface: rgba(0, 0, 0, 0.04);
+  --surface-hover: rgba(0, 0, 0, 0.07);
+  --fg: #111113;
+  --body: #3c3c42;
+  --muted: #6a6a72;
+  --faint: #9a9aa4;
+  --line: rgba(0, 0, 0, 0.09);
+  --line-strong: rgba(0, 0, 0, 0.16);
+  --track: rgba(0, 0, 0, 0.08);
+}
+.card.theme-light.translucent {
+  background: linear-gradient(
+    180deg,
+    rgba(245, 245, 248, 0.7) 0%,
+    rgba(235, 235, 238, 0.7) 100%
+  );
+}
+/* Velo del bloque héroe: en claro un brillo blanco no se ve -> sombra muy suave
+   + filo de luz superior claro. */
+.card.theme-light .usage-block.hero {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.04) 0%,
+    rgba(0, 0, 0, 0.015) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+.card.theme-light .sparkline { color: var(--muted); opacity: 0.4; }
+.card.theme-light .pg-track { stroke: rgba(0, 0, 0, 0.14); }
+.card.theme-light #settings-view::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+}
+.card.theme-light .pos-grid { background: rgba(0, 0, 0, 0.05); }
+.card.theme-light .lang-select option { background: #f5f5f8; color: var(--fg); }
+/* El comando de deps en verde de marca pierde contraste sobre fondo claro. */
+.card.theme-light .deps-cmd { color: #1f8f5f; }
+
 * {
   margin: 0;
   padding: 0;

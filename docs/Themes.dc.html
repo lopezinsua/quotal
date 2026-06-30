@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+html, body { margin:0; background:#050506; }
+
+/* ─── Widget reset ─── */
+.qw, .qw *, .qw *::before, .qw *::after {
+  box-sizing:border-box; margin:0; padding:0;
+  -webkit-user-select:none; user-select:none;
+}
+
+/* ─── Widget base (dark defaults) ─── */
+.qw {
+  --bg-top:#17171b; --bg-bot:#0f0f12;
+  --fg:#f5f5f7; --body:#c9c9cd; --muted:#8a8a90; --faint:#66676c;
+  --line:rgba(255,255,255,0.08); --track:rgba(255,255,255,0.06);
+  --state-ok:oklch(0.76 0.05 162); --state-warn:#ffc533; --state-crit:#ff5d5d;
+  --weekly-ok:oklch(0.66 0.05 264); --green:#59d499;
+  --accent:var(--green); --state:var(--state-ok);
+  --hero-bg:linear-gradient(180deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.018) 100%);
+  --hero-shine:rgba(255,255,255,.06);
+  width:248px; height:268px;
+  background:linear-gradient(180deg,var(--bg-top) 0%,var(--bg-bot) 100%);
+  border-radius:14px; border:1px solid var(--line);
+  display:flex; flex-direction:column; overflow:hidden;
+  font-family:"Segoe UI Variable Display","Segoe UI",-apple-system,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; color:var(--fg);
+}
+
+/* ─── Light theme ─── */
+.qw.th-light {
+  --bg-top:#f5f5f8; --bg-bot:#ebebee;
+  --fg:#111113; --body:#3c3c42; --muted:#6a6a72; --faint:#9a9aa4;
+  --line:rgba(0,0,0,0.09); --track:rgba(0,0,0,0.08);
+  --hero-bg:linear-gradient(180deg,rgba(0,0,0,.04) 0%,rgba(0,0,0,.018) 100%);
+  --hero-shine:rgba(255,255,255,.72);
+}
+
+/* ─── Accent color options ─── */
+.qw.ac-green  { --accent:#59d499; --state-ok:#59d499; }
+.qw.ac-blue   { --accent:#57c1ff; --state-ok:#57c1ff; }
+.qw.ac-violet { --accent:#a78bfa; --state-ok:#a78bfa; }
+.qw.ac-amber  { --accent:#ffc533; --state-ok:#ffc533; }
+
+/* ─── Widget sub-elements ─── */
+.qw .bar { display:flex; align-items:center; justify-content:space-between; padding:9px 9px 7px 13px; }
+.qw .title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); }
+.qw .actions { display:flex; gap:1px; }
+.qw .icon-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; background:transparent; border:none;
+  color:var(--muted); border-radius:6px; cursor:pointer;
+}
+.qw .body { flex:1; display:flex; flex-direction:column; gap:9px; padding:3px 13px 11px; }
+.qw .dot {
+  width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent);
+}
+.qw .plan-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.qw .plan-name { font-size:14px; font-weight:650; letter-spacing:-.01em; color:var(--fg); }
+.qw .plan-sub  { font-size:8.5px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); }
+.qw .usage-block { display:flex; flex-direction:column; }
+.qw .usage-block.hero {
+  position:relative; padding:8px 11px 10px; border-radius:10px;
+  background:var(--hero-bg); border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 var(--hero-shine); overflow:hidden;
+}
+.qw .usage-row {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:8px; position:relative; z-index:1;
+}
+.qw .usage-name { font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); white-space:nowrap; }
+.qw .hero .usage-reset { font-size:9px; color:var(--faint); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+.qw .hero .usage-pct {
+  position:relative; z-index:1; display:block; margin:2px 0 9px;
+  font-size:24px; font-weight:600; line-height:1; letter-spacing:-.02em;
+  color:var(--fg); font-variant-numeric:tabular-nums;
+}
+.qw .sparkline {
+  position:absolute; left:0; right:0; top:22px; width:100%; height:40px;
+  z-index:0; color:var(--state); opacity:.34; pointer-events:none;
+}
+.qw .progress-track {
+  position:relative; width:100%; height:5px; background:var(--track);
+  border-radius:999px; overflow:hidden; box-shadow:inset 0 1px 1.5px rgba(0,0,0,.3); z-index:1;
+}
+.qw .progress-fill {
+  height:100%; border-radius:999px; background-color:var(--fill,var(--state-ok));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.25);
+}
+.qw .progress-fill.session { --fill:var(--state-ok); }
+.qw .progress-fill.weekly  { --fill:var(--weekly-ok); }
+.qw .usage-block.compact { gap:5px; border-top:1px solid var(--line); padding-top:9px; }
+.qw .usage-block.compact .usage-name { text-transform:none; font-size:11px; font-weight:500; letter-spacing:.01em; color:var(--body); }
+.qw .usage-pct { font-size:12px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums; flex:none; white-space:nowrap; }
+.qw .usage-foot { font-size:9.5px; color:var(--faint); }
+.qw .context-line { display:flex; align-items:center; gap:7px; border-top:1px solid var(--line); padding-top:9px; font-size:11px; }
+.qw .context-label { color:var(--body); white-space:nowrap; }
+.qw .context-pct { margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); flex:none; white-space:nowrap; }
+.qw .freshness { font-size:9px; color:var(--faint); text-align:right; margin-top:auto; letter-spacing:.02em; padding-right:3px; }
+
+/* ─── Token legend ─── */
+.tleg { display:flex; flex-direction:column; width:248px; }
+.trow {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:3.5px 0; border-bottom:1px solid rgba(255,255,255,.045);
+}
+.trow:last-child { border-bottom:none; }
+.trow.on-light   { border-bottom-color:rgba(0,0,0,.07); }
+.tkey { font-size:9px; font-family:"SF Mono",Menlo,Consolas,monospace; color:#4c4d57; letter-spacing:.01em; white-space:nowrap; }
+.tval-wrap { display:flex; align-items:center; gap:5px; }
+.tchip { width:9px; height:9px; border-radius:2px; flex:none; }
+.tval  { font-size:9px; font-family:"SF Mono",Menlo,Consolas,monospace; color:#70717c; white-space:nowrap; }
+</style>
+</helmet>
+
+<!-- ── Board canvas 1200×560 ── -->
+<div style="position:relative; width:1200px; height:560px; overflow:hidden;
+  background:radial-gradient(ellipse 100% 60% at 50% -5%, #14192a 0%, #0c0d12 52%, #050506 100%);
+  font-family:'SF Pro Text','Segoe UI',-apple-system,system-ui,sans-serif; color:#f5f5f7;">
+
+  <!-- Column hairlines -->
+  <div style="position:absolute; left:436px; top:52px; bottom:30px; width:1px;
+    background:linear-gradient(to bottom,transparent,rgba(255,255,255,.065) 22%,rgba(255,255,255,.065) 78%,transparent);"></div>
+  <div style="position:absolute; left:764px; top:52px; bottom:30px; width:1px;
+    background:linear-gradient(to bottom,transparent,rgba(255,255,255,.065) 22%,rgba(255,255,255,.065) 78%,transparent);"></div>
+
+  <!-- Board caption -->
+  <div style="position:absolute; left:60px; top:44px;">
+    <div style="font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:#55565f;">Themes</div>
+    <div style="margin-top:6px; font-size:16px; font-weight:500; letter-spacing:-.015em; color:#9a9ba5; line-height:1.3;">Dark, light, and a pickable accent color</div>
+  </div>
+
+
+  <!-- ══════════════ COL 1 · DARK ══════════════ -->
+  <div style="position:absolute; left:148px; top:92px;">
+
+    <div style="font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#55565f; margin-bottom:14px;">Dark</div>
+
+    <div class="qw" style="filter:drop-shadow(0 10px 30px rgba(0,0,0,.75));">
+      <header class="bar">
+        <span class="title">Quotal</span>
+        <div class="actions">
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="16" x2="12" y2="22"></line><path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+      </header>
+      <section class="body">
+        <div class="plan-head"><span class="plan-name">Pro</span><span class="plan-sub">Plan usage limits</span></div>
+        <div class="usage-block hero">
+          <svg class="sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sg-dk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".32"></stop><stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop></linearGradient></defs>
+            <polygon fill="url(#sg-dk)" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1 100,24 0,24"></polygon>
+            <polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1"></polyline>
+          </svg>
+          <div class="usage-row"><span class="usage-name">Current session</span><span class="usage-reset">in 3h 55m</span></div>
+          <span class="usage-pct">62% used</span>
+          <div class="progress-track"><div class="progress-fill session" style="width:62%"></div></div>
+        </div>
+        <div class="usage-block compact">
+          <div class="usage-row"><span class="usage-name">Weekly · all models</span><span class="usage-pct">28% used</span></div>
+          <div class="progress-track"><div class="progress-fill weekly" style="width:28%"></div></div>
+          <div class="usage-foot"><span class="usage-reset">Mon 09:00</span></div>
+        </div>
+        <div class="context-line"><span class="dot"></span><span class="context-label">Context · 200k</span><span class="context-pct">44% · 88.2k</span></div>
+        <p class="freshness">Updated 2 min ago</p>
+      </section>
+    </div>
+
+    <!-- Token legend -->
+    <div class="tleg" style="margin-top:14px;">
+      <div class="trow"><span class="tkey">--bg-top</span><span class="tval-wrap"><span class="tchip" style="background:#17171b;border:1px solid rgba(255,255,255,.13);"></span><span class="tval">#17171b</span></span></div>
+      <div class="trow"><span class="tkey">--bg-bot</span><span class="tval-wrap"><span class="tchip" style="background:#0f0f12;border:1px solid rgba(255,255,255,.13);"></span><span class="tval">#0f0f12</span></span></div>
+      <div class="trow"><span class="tkey">--fg</span><span class="tval-wrap"><span class="tchip" style="background:#f5f5f7;border:1px solid rgba(255,255,255,.13);"></span><span class="tval">#f5f5f7</span></span></div>
+      <div class="trow"><span class="tkey">--body</span><span class="tval-wrap"><span class="tchip" style="background:#c9c9cd;border:1px solid rgba(255,255,255,.13);"></span><span class="tval">#c9c9cd</span></span></div>
+      <div class="trow"><span class="tkey">--muted</span><span class="tval-wrap"><span class="tchip" style="background:#8a8a90;border:1px solid rgba(255,255,255,.13);"></span><span class="tval">#8a8a90</span></span></div>
+      <div class="trow"><span class="tkey">--line</span><span class="tval-wrap"><span class="tchip" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);"></span><span class="tval">rgba(255,255,255,.08)</span></span></div>
+      <div class="trow"><span class="tkey">--track</span><span class="tval-wrap"><span class="tchip" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);"></span><span class="tval">rgba(255,255,255,.06)</span></span></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════ COL 2 · LIGHT ══════════════ -->
+  <div style="position:absolute; left:476px; top:92px;">
+
+    <div style="font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#55565f; margin-bottom:14px;">Light</div>
+
+    <div class="qw th-light" style="filter:drop-shadow(0 10px 36px rgba(0,0,0,.8));">
+      <header class="bar">
+        <span class="title">Quotal</span>
+        <div class="actions">
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="16" x2="12" y2="22"></line><path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+      </header>
+      <section class="body">
+        <div class="plan-head"><span class="plan-name">Pro</span><span class="plan-sub">Plan usage limits</span></div>
+        <div class="usage-block hero">
+          <svg class="sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sg-lt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".22"></stop><stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop></linearGradient></defs>
+            <polygon fill="url(#sg-lt)" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1 100,24 0,24"></polygon>
+            <polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1"></polyline>
+          </svg>
+          <div class="usage-row"><span class="usage-name">Current session</span><span class="usage-reset">in 3h 55m</span></div>
+          <span class="usage-pct">62% used</span>
+          <div class="progress-track"><div class="progress-fill session" style="width:62%"></div></div>
+        </div>
+        <div class="usage-block compact">
+          <div class="usage-row"><span class="usage-name">Weekly · all models</span><span class="usage-pct">28% used</span></div>
+          <div class="progress-track"><div class="progress-fill weekly" style="width:28%"></div></div>
+          <div class="usage-foot"><span class="usage-reset">Mon 09:00</span></div>
+        </div>
+        <div class="context-line"><span class="dot"></span><span class="context-label">Context · 200k</span><span class="context-pct">44% · 88.2k</span></div>
+        <p class="freshness">Updated 2 min ago</p>
+      </section>
+    </div>
+
+    <!-- Token legend (light) -->
+    <div class="tleg" style="margin-top:14px;">
+      <div class="trow on-light"><span class="tkey">--bg-top</span><span class="tval-wrap"><span class="tchip" style="background:#f5f5f8;border:1px solid rgba(0,0,0,.12);"></span><span class="tval">#f5f5f8</span></span></div>
+      <div class="trow on-light"><span class="tkey">--bg-bot</span><span class="tval-wrap"><span class="tchip" style="background:#ebebee;border:1px solid rgba(0,0,0,.12);"></span><span class="tval">#ebebee</span></span></div>
+      <div class="trow on-light"><span class="tkey">--fg</span><span class="tval-wrap"><span class="tchip" style="background:#111113;border:1px solid rgba(0,0,0,.12);"></span><span class="tval">#111113</span></span></div>
+      <div class="trow on-light"><span class="tkey">--body</span><span class="tval-wrap"><span class="tchip" style="background:#3c3c42;border:1px solid rgba(0,0,0,.12);"></span><span class="tval">#3c3c42</span></span></div>
+      <div class="trow on-light"><span class="tkey">--muted</span><span class="tval-wrap"><span class="tchip" style="background:#6a6a72;border:1px solid rgba(0,0,0,.12);"></span><span class="tval">#6a6a72</span></span></div>
+      <div class="trow on-light"><span class="tkey">--line</span><span class="tval-wrap"><span class="tchip" style="background:rgba(0,0,0,.09);border:1px solid rgba(0,0,0,.15);"></span><span class="tval">rgba(0,0,0,.09)</span></span></div>
+      <div class="trow on-light"><span class="tkey">--track</span><span class="tval-wrap"><span class="tchip" style="background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.15);"></span><span class="tval">rgba(0,0,0,.08)</span></span></div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════ COL 3 · ACCENT ══════════════ -->
+  <div style="position:absolute; left:804px; top:92px;">
+
+    <div style="font-size:10px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#55565f; margin-bottom:14px;">Accent</div>
+
+    <!-- Widget: dark base with violet accent active -->
+    <div class="qw ac-violet" style="filter:drop-shadow(0 10px 30px rgba(0,0,0,.75));">
+      <header class="bar">
+        <span class="title">Quotal</span>
+        <div class="actions">
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="16" x2="12" y2="22"></line><path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+        </div>
+      </header>
+      <section class="body">
+        <div class="plan-head"><span class="plan-name">Pro</span><span class="plan-sub">Plan usage limits</span></div>
+        <div class="usage-block hero">
+          <svg class="sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sg-ac" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".32"></stop><stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop></linearGradient></defs>
+            <polygon fill="url(#sg-ac)" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1 100,24 0,24"></polygon>
+            <polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1"></polyline>
+          </svg>
+          <div class="usage-row"><span class="usage-name">Current session</span><span class="usage-reset">in 3h 55m</span></div>
+          <span class="usage-pct">62% used</span>
+          <div class="progress-track"><div class="progress-fill session" style="width:62%"></div></div>
+        </div>
+        <div class="usage-block compact">
+          <div class="usage-row"><span class="usage-name">Weekly · all models</span><span class="usage-pct">28% used</span></div>
+          <div class="progress-track"><div class="progress-fill weekly" style="width:28%"></div></div>
+          <div class="usage-foot"><span class="usage-reset">Mon 09:00</span></div>
+        </div>
+        <div class="context-line"><span class="dot"></span><span class="context-label">Context · 200k</span><span class="context-pct">44% · 88.2k</span></div>
+        <p class="freshness">Updated 2 min ago</p>
+      </section>
+    </div>
+
+    <!-- Accent swatch picker -->
+    <div style="display:flex; align-items:center; gap:12px; margin-top:13px;">
+      <span style="font-size:9px; font-family:'SF Mono',Menlo,monospace; color:#4c4d57; letter-spacing:.01em; flex:none;">--accent</span>
+      <!-- green -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:15px;height:15px;border-radius:50%;background:#59d499;box-shadow:0 0 0 1px rgba(255,255,255,.12);"></div>
+        <span style="font-size:7px;color:#4c4d57;letter-spacing:.05em;">green</span>
+      </div>
+      <!-- blue -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:15px;height:15px;border-radius:50%;background:#57c1ff;box-shadow:0 0 0 1px rgba(255,255,255,.12);"></div>
+        <span style="font-size:7px;color:#4c4d57;letter-spacing:.05em;">blue</span>
+      </div>
+      <!-- violet (selected) -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:15px;height:15px;border-radius:50%;background:#a78bfa;
+          box-shadow:0 0 0 2px #050506, 0 0 0 3.5px #a78bfa, 0 0 8px rgba(167,139,250,.45);"></div>
+        <span style="font-size:7px;color:#a78bfa;letter-spacing:.05em;font-weight:600;">violet</span>
+      </div>
+      <!-- amber -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:15px;height:15px;border-radius:50%;background:#ffc533;box-shadow:0 0 0 1px rgba(255,255,255,.12);"></div>
+        <span style="font-size:7px;color:#4c4d57;letter-spacing:.05em;">amber</span>
+      </div>
+    </div>
+
+    <!-- Token legend (accent) -->
+    <div class="tleg" style="margin-top:10px;">
+      <div class="trow"><span class="tkey">--bg-top / --bg-bot</span><span class="tval-wrap"><span class="tval" style="font-style:italic;">same as dark</span></span></div>
+      <div class="trow"><span class="tkey">--fg / --body / --muted</span><span class="tval-wrap"><span class="tval" style="font-style:italic;">same as dark</span></span></div>
+      <div class="trow"><span class="tkey">--line / --track</span><span class="tval-wrap"><span class="tval" style="font-style:italic;">same as dark</span></span></div>
+      <div class="trow"><span class="tkey">--state-ok</span><span class="tval-wrap"><span class="tval" style="font-style:italic;">→ --accent</span></span></div>
+      <!-- accent row, highlighted -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 6px;
+        background:rgba(167,139,250,.08);border-radius:5px;margin-top:3px;">
+        <span class="tkey" style="color:#a78bfa;">--accent</span>
+        <span class="tval-wrap" style="gap:6px;">
+          <span class="tchip" style="background:#59d499;border-radius:50%;"></span>
+          <span class="tchip" style="background:#57c1ff;border-radius:50%;"></span>
+          <span class="tchip" style="background:#a78bfa;border-radius:50%;box-shadow:0 0 0 1.5px rgba(167,139,250,.5);"></span>
+          <span class="tchip" style="background:#ffc533;border-radius:50%;"></span>
+          <span class="tval" style="color:#a78bfa;">configurable</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- State colors preserved footer -->
+  <div style="position:absolute; bottom:18px; left:0; right:0;
+    display:flex; align-items:center; justify-content:center; gap:20px;">
+    <span style="font-size:8.5px; color:#3a3b44; letter-spacing:.1em; text-transform:uppercase;">Preserved across all themes</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:8.5px;color:#50515b;">
+      <span style="width:6px;height:6px;border-radius:50%;background:oklch(0.76 0.05 162);flex:none;"></span>ok
+    </span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:8.5px;color:#50515b;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#ffc533;flex:none;"></span>warning
+    </span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:8.5px;color:#50515b;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#ff5d5d;flex:none;"></span>critical
+    </span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:8.5px;color:#50515b;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#59d499;flex:none;"></span>brand green
+    </span>
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>

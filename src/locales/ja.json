@@ -68,5 +68,14 @@
   "deps_hint": "次のコマンドでインストール：",
   "deps_copy": "コマンドをコピー",
   "deps_copied": "コピーしました",
+  "opt_theme": "テーマ",
+  "theme_dark": "ダーク",
+  "theme_light": "ライト",
+  "opt_accent": "アクセントカラー",
+  "accent_default": "デフォルト",
+  "accent_green": "グリーン",
+  "accent_blue": "ブルー",
+  "accent_violet": "バイオレット",
+  "accent_amber": "アンバー",
   "_auto": "自動"
 }

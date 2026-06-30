@@ -68,5 +68,14 @@
   "deps_hint": "다음 명령으로 설치하세요:",
   "deps_copy": "명령 복사",
   "deps_copied": "복사됨",
+  "opt_theme": "테마",
+  "theme_dark": "다크",
+  "theme_light": "라이트",
+  "opt_accent": "강조 색상",
+  "accent_default": "기본",
+  "accent_green": "초록",
+  "accent_blue": "파랑",
+  "accent_violet": "보라",
+  "accent_amber": "앰버",
   "_auto": "자동"
 }
