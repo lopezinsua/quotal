@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  html, body { margin: 0; background: #050506; }
+  .badge { display:inline-flex; height:20px; border-radius:3px; overflow:hidden; font-family:DejaVu Sans,Verdana,Geneva,sans-serif; font-size:11px; line-height:1; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+  .badge .lbl { padding:0 6px; display:flex; align-items:center; background:#555; color:#fff; white-space:nowrap; }
+  .badge .val { padding:0 7px; display:flex; align-items:center; color:#fff; white-space:nowrap; font-weight:600; }
+  .badge .val.green  { background:#3d7a4d; }
+  .badge .val.blue   { background:#2a5fa5; }
+  .badge .val.purple { background:#5a4fa5; }
+  .badge .val.grey   { background:#444; }
+  .md-block { font-family:ui-monospace,'SF Mono','Cascadia Code',monospace; font-size:12px; line-height:1.7; color:#8a8a90; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07); border-radius:8px; padding:16px 20px; white-space:pre; }
+  .md-block .c { color:#59d499; }
+  .md-block .s { color:#c9c9cd; }
+</style>
+</helmet>
+<div style="width:900px; padding:56px 72px; background:#050506; display:flex; flex-direction:column; gap:40px;
+      font-family:'Segoe UI',-apple-system,system-ui,sans-serif; color:#f5f5f7;">
+
+  <div>
+    <div style="font-size:13px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#7c7e86; white-space:nowrap; margin-bottom:18px;">README badges — preview</div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+      <span class="badge"><span class="lbl">release</span><span class="val green">v0.3.1</span></span>
+      <span class="badge"><span class="lbl">platform</span><span class="val blue">Windows · macOS · Linux</span></span>
+      <span class="badge"><span class="lbl">built with</span><span class="val purple">Tauri 2</span></span>
+      <span class="badge"><span class="lbl">license</span><span class="val grey">MIT</span></span>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-size:13px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#7c7e86; white-space:nowrap; margin-bottom:16px;">shields.io markdown (paste at top of README)</div>
+    <div class="md-block"><span class="c">![Release]</span><span class="s">(https://img.shields.io/github/v/release/lopezinsua/quotal?style=flat-square&amp;color=2f3138&amp;labelColor=111)</span>
+<span class="c">![Platform]</span><span class="s">(https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2f3138?style=flat-square&amp;labelColor=111)</span>
+<span class="c">![Tauri]</span><span class="s">(https://img.shields.io/badge/built_with-Tauri_2-2f3138?style=flat-square&amp;labelColor=111)</span>
+<span class="c">![License]</span><span class="s">(https://img.shields.io/github/license/lopezinsua/quotal?style=flat-square&amp;color=2f3138&amp;labelColor=111)</span></div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

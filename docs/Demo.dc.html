@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  html, body { margin: 0; background: #050506; }
+  .qw, .qw *, .qw *::before, .qw *::after { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  .qw {
+    --bg-top:#17171b; --bg-bot:#0f0f12; --fg:#f5f5f7; --body:#c9c9cd; --muted:#8a8a90; --faint:#66676c;
+    --line:rgba(255,255,255,0.08); --track:rgba(255,255,255,0.06);
+    --state-ok:oklch(0.76 0.05 162); --state-warn:#ffc533; --state-crit:#ff5d5d;
+    --weekly-ok:oklch(0.66 0.05 264); --green:#59d499;
+    --accent:var(--green); --state:var(--state-ok);
+    --border-warn:rgba(255,197,51,0.55); --border-crit:rgba(255,93,93,0.7);
+    position:relative; width:248px; height:268px;
+    background:linear-gradient(180deg,var(--bg-top),var(--bg-bot));
+    border-radius:14px; border:1px solid var(--line); overflow:hidden;
+    font-family:"Segoe UI Variable Display","Segoe UI",-apple-system,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; color:var(--fg);
+    transition: width .55s cubic-bezier(.16,1,.3,1), height .55s cubic-bezier(.16,1,.3,1),
+                border-radius .55s cubic-bezier(.16,1,.3,1), box-shadow .35s ease;
+  }
+  .qw.sev-warning  { --state:var(--state-warn); box-shadow:inset 0 0 0 1.5px var(--border-warn); }
+  .qw.sev-critical { --state:var(--state-crit); box-shadow:inset 0 0 0 1.5px var(--border-crit), inset 0 0 12px rgba(255,93,93,.12); }
+  .qw.is-pill { width:152px; height:40px; border-radius:999px; }
+  .qw #full { position:absolute; inset:0; display:flex; flex-direction:column; transition:opacity .25s ease; }
+  .qw.is-pill #full { opacity:0; pointer-events:none; }
+  .qw #pillview { position:absolute; inset:0; display:flex; align-items:center; gap:7px; padding:0 14px; opacity:0; transition:opacity .28s ease .1s; font-variant-numeric:tabular-nums; }
+  .qw.is-pill #pillview { opacity:1; }
+  .qw #pillview .p-num { font-size:13px; font-weight:650; color:var(--fg); flex:none; }
+  .qw #pillview .p-track { flex:1; min-width:0; height:5px; background:var(--track); border-radius:999px; overflow:hidden; }
+  .qw #pillview .p-fill  { display:block; height:100%; border-radius:999px; background:var(--state); box-shadow:inset 0 1px 0 rgba(255,255,255,.28); transition:width .5s cubic-bezier(.4,0,.2,1); }
+  .qw .bar   { display:flex; align-items:center; justify-content:space-between; padding:9px 9px 7px 13px; }
+  .qw .title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); }
+  .qw .actions { display:flex; gap:1px; }
+  .qw .icon-btn { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background:transparent; border:none; color:var(--muted); border-radius:6px; }
+  .qw .body  { flex:1; display:flex; flex-direction:column; gap:9px; padding:3px 13px 11px; }
+  .qw .dot   { width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent); }
+  .qw .plan-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .qw .plan-name { font-size:14px; font-weight:650; letter-spacing:-.01em; color:var(--fg); }
+  .qw .plan-sub  { font-size:8.5px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--faint); }
+  .qw .usage-block { display:flex; flex-direction:column; }
+  .qw .usage-block.hero { position:relative; padding:8px 11px 10px; border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018)); border:1px solid var(--line); box-shadow:inset 0 1px 0 rgba(255,255,255,.06); overflow:hidden; }
+  .qw .usage-row  { display:flex; align-items:baseline; justify-content:space-between; gap:8px; position:relative; z-index:1; }
+  .qw .usage-name { font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); white-space:nowrap; flex:none; }
+  .qw .hero .usage-reset { font-size:9px; color:var(--faint); font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+  .qw .hero .usage-pct   { position:relative; z-index:1; display:block; margin:2px 0 9px; font-size:24px; font-weight:600; line-height:1; letter-spacing:-.02em; color:var(--fg); font-variant-numeric:tabular-nums; }
+  .qw .sparkline { position:absolute; left:0; right:0; top:22px; width:100%; height:40px; z-index:0; color:var(--state); opacity:.32; pointer-events:none; transition:color .35s ease; }
+  .qw .progress-track { width:100%; height:5px; background:var(--track); border-radius:999px; overflow:hidden; box-shadow:inset 0 1px 1.5px rgba(0,0,0,.3); z-index:1; }
+  .qw .progress-fill { height:100%; border-radius:999px; background-color:var(--fill,var(--state-ok)); transition:width .55s cubic-bezier(.4,0,.2,1), background-color .35s ease; box-shadow:inset 0 1px 0 rgba(255,255,255,.25); }
+  .qw .progress-fill.session { --fill:var(--state-ok); }
+  .qw .progress-fill.weekly  { --fill:var(--weekly-ok); }
+  .qw .progress-fill.warn    { --fill:var(--state-warn); }
+  .qw .progress-fill.crit    { --fill:var(--state-crit); }
+  .qw .usage-block.compact { gap:5px; border-top:1px solid var(--line); padding-top:9px; }
+  .qw .usage-block.compact .usage-name { text-transform:none; font-size:11px; font-weight:500; letter-spacing:.01em; color:var(--body); }
+  .qw .usage-pct  { font-size:12px; font-weight:600; color:var(--fg); font-variant-numeric:tabular-nums; flex:none; white-space:nowrap; }
+  .qw .usage-foot { font-size:9.5px; color:var(--faint); }
+  .qw .context-line  { display:flex; align-items:center; gap:7px; border-top:1px solid var(--line); padding-top:9px; font-size:11px; }
+  .qw .context-label { color:var(--body); white-space:nowrap; }
+  .qw .context-pct   { margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); flex:none; white-space:nowrap; }
+  .qw .freshness { font-size:9px; color:var(--faint); text-align:right; margin-top:auto; letter-spacing:.02em; padding-right:3px; }
+</style>
+</helmet>
+<div style="position:relative; width:900px; height:560px; overflow:hidden;
+      background:radial-gradient(110% 90% at 50% -5%, #16181f 0%, #0b0c0f 55%, #050506 100%);
+      display:flex; align-items:center; justify-content:center;">
+  <div style="transform:scale(1.85); transform-origin:center; filter:drop-shadow(0 30px 56px rgba(0,0,0,.64));">
+    <main class="{{ cardClass }}">
+      <div id="full">
+        <header class="bar">
+          <span class="title">Quotal</span>
+          <div class="actions">
+            <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="16" x2="12" y2="22"></line><path d="M8.5 3.5h7l-1 7 2.5 2.5H7l2.5-2.5-1-7z"></path></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+            <button class="icon-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </div>
+        </header>
+        <section class="body">
+          <div class="plan-head"><span class="plan-name">Pro</span><span class="plan-sub">Plan usage limits</span></div>
+          <div class="usage-block hero">
+            <svg class="sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+              <polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" points="0,14.4 14.3,13.4 28.6,14.2 42.9,11.5 57.1,12.2 71.4,10.1 85.7,10.8 100,9.1"></polyline>
+            </svg>
+            <div class="usage-row">
+              <span class="usage-name">Current session</span>
+              <span class="usage-reset">{{ sReset }}</span>
+            </div>
+            <span class="usage-pct">{{ sPct }}</span>
+            <div class="progress-track">{{ sessionBar }}</div>
+          </div>
+          <div class="usage-block compact">
+            <div class="usage-row"><span class="usage-name">Weekly · all models</span><span class="usage-pct">{{ wPct }}</span></div>
+            <div class="progress-track">{{ weeklyBar }}</div>
+            <div class="usage-foot"><span>Mon 09:00</span></div>
+          </div>
+          <div class="context-line"><span class="dot"></span><span class="context-label">Context · 200k</span><span class="context-pct">{{ ctx }}</span></div>
+          <p class="freshness">Updated just now</p>
+        </section>
+      </div>
+      <div id="pillview">
+        <span class="p-num">{{ pillPct }}</span>
+        <span class="p-track">{{ pillFill }}</span>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { step: 0 };
+
+  static STEPS = [
+    { dur: 2400, card: 'qw',              sFill: 'progress-fill session',      sW: '62%', sPct: '62% used', sReset: 'in 3h 55m', wFill: 'progress-fill weekly',      wW: '28%', wPct: '28% used', ctx: '44% · 88.2k' },
+    { dur: 2400, card: 'qw sev-warning',  sFill: 'progress-fill session warn', sW: '82%', sPct: '82% used', sReset: 'in 2h 30m', wFill: 'progress-fill weekly',      wW: '71%', wPct: '71% used', ctx: '58% · 116k'  },
+    { dur: 2400, card: 'qw sev-critical', sFill: 'progress-fill session crit', sW: '95%', sPct: '95% used', sReset: 'in 1h 12m', wFill: 'progress-fill weekly warn', wW: '88%', wPct: '88% used', ctx: '72% · 144k'  },
+    { dur: 2000, card: 'qw sev-critical is-pill', pill: true }
+  ];
+
+  componentDidMount() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const tick = () => {
+      const cur = Component.STEPS[this.state.step];
+      this._t = setTimeout(() => {
+        const next = (this.state.step + 1) % Component.STEPS.length;
+        this.setState({ step: next });
+        tick();
+      }, cur.dur);
+    };
+    tick();
+  }
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  renderVals() {
+    const st = Component.STEPS[this.state.step];
+    const ce = React.createElement;
+    return {
+      cardClass: st.card,
+      sPct:      st.sPct   || '62% used',
+      sReset:    st.sReset || '',
+      wPct:      st.wPct   || '28% used',
+      ctx:       st.ctx    || '44% · 88.2k',
+      pillPct:   st.pill ? '95%' : '',
+      // React-controlled leaves — guaranteed to animate via CSS transition
+      sessionBar: ce('div', { key: 'sb', className: st.sFill || 'progress-fill session', style: { width: st.sW || '62%' } }),
+      weeklyBar:  ce('div', { key: 'wb', className: st.wFill || 'progress-fill weekly',  style: { width: st.wW || '28%' } }),
+      pillFill:   ce('span', { key: 'pf', className: 'p-fill', style: { width: st.pill ? '95%' : '0%' } }),
+    };
+  }
+}
+</script>
+</body>
+</html>

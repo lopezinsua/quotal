@@ -30,7 +30,7 @@ and the context window of your active Claude Code session — at a glance.
     A GIF at the top is the single biggest first-impression boost.
 -->
 
-<img src="docs/media/demo.gif" alt="Quotal in action" width="640" />
+<img src="docs/media/desktop.png" alt="Quotal in action" width="680" />
 
 _Live session %, weekly quota and context window — always visible, no commands._
 
