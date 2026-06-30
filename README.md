@@ -26,7 +26,7 @@ and the context window of your active Claude Code session — at a glance.
 
 <!-- Generated from docs/Demo.dc.html (animated mockup) — see docs/media/demo.gif -->
 
-<img src="docs/media/demo.gif" alt="Quotal in action" width="680" />
+<img src="docs/media/demo.gif" alt="Quotal in action" width="560" />
 
 _Live session %, weekly quota and context window — always visible, no commands._
 
@@ -92,11 +92,21 @@ turns that same data into something **ambient**.
 
 ## Screenshots
 
-<!-- Add real captures to docs/media/ and they'll render here. -->
+<div align="center">
 
-| Desktop | Pill mode | Tray |
-| :---: | :---: | :---: |
-| <img src="docs/media/desktop.png" width="220" alt="Desktop widget" /> | <img src="docs/media/pill.png" width="220" alt="Pill mode" /> | <img src="docs/media/tray.png" width="220" alt="Tray icon" /> |
+**Desktop widget** — live session %, weekly quota and context window, always on top.
+
+<img src="docs/media/desktop.png" width="720" alt="Quotal desktop widget" />
+
+**Pill mode** — three compact styles (`bar` · `ring` · `minimal`), expands on hover.
+
+<img src="docs/media/pill.png" width="720" alt="Pill modes: bar, ring and minimal" />
+
+**Tray icon** — lives in your menu bar and changes color by severity (`normal` · `warning` · `critical`).
+
+<img src="docs/media/tray.png" width="720" alt="Tray icon severity states with popover" />
+
+</div>
 
 ## Install
 
