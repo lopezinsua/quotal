@@ -26,7 +26,7 @@ and the context window of your active Claude Code session — at a glance.
 
 <!-- Generated from docs/Demo.dc.html (animated mockup) — see docs/media/demo.gif -->
 
-<img src="docs/media/demo.gif?v=2" alt="Quotal in action" width="560" />
+<img src="docs/media/demo.gif?v=3" alt="Quotal in action" width="560" />
 
 _Live session %, weekly quota and context window — always visible, no commands._
 
