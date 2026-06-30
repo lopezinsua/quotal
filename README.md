@@ -24,13 +24,9 @@ and the context window of your active Claude Code session — at a glance.
 
 <div align="center">
 
-<!--
-  ▶ Drop a 10–15s screen recording of the widget here as docs/media/demo.gif
-    (live usage updating, pill collapse/expand, tray color change).
-    A GIF at the top is the single biggest first-impression boost.
--->
+<!-- Generated from docs/Demo.dc.html (animated mockup) — see docs/media/demo.gif -->
 
-<img src="docs/media/desktop.png" alt="Quotal in action" width="680" />
+<img src="docs/media/demo.gif" alt="Quotal in action" width="680" />
 
 _Live session %, weekly quota and context window — always visible, no commands._
 
