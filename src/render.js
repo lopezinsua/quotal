@@ -207,7 +207,11 @@ export function render(p) {
   if (el.schemaWarn) {
     const srcs = p.schema_warning;
     if (srcs && srcs.length) {
-      el.schemaWarn.textContent = t("schema_warn", { src: srcs.join(", ") });
+      let msg = t("schema_warn", { src: srcs.join(", ") });
+      // Contextualiza con la versión de Claude Code observada (proper noun +
+      // versión, neutral a idioma): ayuda a correlacionar el cambio de formato.
+      if (p.claude_code_version) msg += ` · Claude Code v${p.claude_code_version}`;
+      el.schemaWarn.textContent = msg;
       el.schemaWarn.classList.remove("hidden");
     } else {
       el.schemaWarn.classList.add("hidden");

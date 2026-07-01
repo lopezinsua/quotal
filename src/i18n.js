@@ -101,6 +101,7 @@ const BASE = {
   pin_fix: "Pin open",
   plan: "Plan",
   schema_warn: "⚠ Quotal may not be reading Claude Code correctly (changed: {src}). Check for an update.",
+  schema_warn_hint: "Check for a Quotal update",
   upd_available: "Update available: v{v}",
   upd_install: "Update",
   upd_dismiss: "Dismiss",
