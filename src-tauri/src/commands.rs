@@ -27,6 +27,7 @@ pub fn get_metrics(state: State<'_, SharedHandle>) -> MetricsPayload {
         active: UsageMetrics::none(),
         plan: usage_api::PlanInfo::default(),
         schema_warning: None,
+        claude_code_version: None,
     })
 }
 

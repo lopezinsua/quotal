@@ -28,6 +28,33 @@ fn log_path() -> std::path::PathBuf {
     paths::widget_dir().join("schema_error.log")
 }
 
+/// Última versión de Claude Code observada (del JSON del statusLine). Sirve para
+/// (a) correlacionar una deriva con la versión de CC que la introdujo —queda en el
+/// log— y (b) que la UI avise proactivamente si el formato podría haber cambiado.
+fn cc_version() -> &'static Mutex<Option<String>> {
+    static V: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    V.get_or_init(|| Mutex::new(None))
+}
+
+/// Registra la versión de Claude Code vista en el statusLine (idempotente).
+pub fn set_claude_version(version: &str) {
+    let v = version.trim();
+    if v.is_empty() {
+        return;
+    }
+    if let Ok(mut cur) = cc_version().lock() {
+        if cur.as_deref() != Some(v) {
+            *cur = Some(v.to_string());
+        }
+    }
+}
+
+/// Versión de Claude Code observada, si alguna. La UI la muestra y la usa para
+/// contextualizar el aviso de deriva.
+pub fn claude_version() -> Option<String> {
+    cc_version().lock().ok().and_then(|c| c.clone())
+}
+
 /// Reporta el estado de parseo de una fuente:
 ///   - `Some(detail)` -> DERIVA (contenedor presente, campos esperados ausentes).
 ///   - `None`         -> OK (parseó bien; limpia cualquier deriva previa).
@@ -60,8 +87,11 @@ fn append_log(source: &str, detail: &str) {
         return;
     }
     use std::io::Write;
+    // Incluimos la versión de Claude Code observada (si la hay) para poder
+    // correlacionar QUÉ versión de CC introdujo el cambio de formato.
+    let cc = claude_version().map(|v| format!(" [cc v{v}]")).unwrap_or_default();
     let line = format!(
-        "{} [v{}] {source}: {detail}\n",
+        "{} [quotal v{}]{cc} {source}: {detail}\n",
         chrono::Local::now().to_rfc3339(),
         env!("CARGO_PKG_VERSION"),
     );

@@ -563,6 +563,11 @@ pub fn parse_capture() -> Option<UsageMetrics> {
     let path = paths::capture_path();
     let raw = std::fs::read_to_string(&path).ok()?;
     let value = last_json_value(&raw)?;
+    // Versión de Claude Code (campo `version` del statusLine): la registramos para
+    // correlacionar cualquier deriva con la versión de CC y para avisar en la UI.
+    if let Some(v) = claude_version(&value) {
+        crate::schema_watch::set_claude_version(&v);
+    }
     // Telemetría de deriva: la captura está y es JSON, así que si un contenedor
     // conocido (`context_window`/`rate_limits`) perdió sus campos, avisamos.
     crate::schema_watch::report("statusline", capture_drift_detail(&value));
@@ -590,6 +595,13 @@ fn capture_drift_detail(v: &Value) -> Option<String> {
         }
     }
     None
+}
+
+/// Extrae la versión de Claude Code del JSON del statusLine (campo top-level
+/// `version`, p. ej. "2.1.197"). Función PURA. `None` si no está o no es texto.
+fn claude_version(value: &Value) -> Option<String> {
+    let v = value.get("version")?.as_str()?.trim();
+    (!v.is_empty()).then(|| v.to_string())
 }
 
 /// El hook puede escribir varias líneas; nos quedamos con el ÚLTIMO objeto JSON
@@ -725,6 +737,15 @@ mod tests {
         let m = metrics_from_capture(&v, 0).unwrap();
         assert_eq!(m.tokens_used, Some(200_000));
         assert_eq!(m.percent_used, Some(100.0));
+    }
+
+    #[test]
+    fn claude_version_extrae_el_campo_version() {
+        assert_eq!(claude_version(&json!({ "version": "2.1.197" })).as_deref(), Some("2.1.197"));
+        // Ausente, vacío o no-texto → None.
+        assert!(claude_version(&json!({ "model": "x" })).is_none());
+        assert!(claude_version(&json!({ "version": "  " })).is_none());
+        assert!(claude_version(&json!({ "version": 2 })).is_none());
     }
 
     #[test]
