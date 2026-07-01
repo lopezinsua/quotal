@@ -108,6 +108,19 @@ impl SharedState {
         }
     }
 
+    /// Asigna la métrica de una fuente de contexto por su `id` estable (el mismo
+    /// que expone `providers::ContextProvider::id`). Centraliza el mapeo id→campo
+    /// para que el watcher itere sobre el registro de proveedores sin conocer los
+    /// campos concretos. Un id desconocido se ignora (robusto ante proveedores nuevos).
+    pub(crate) fn set_context(&mut self, id: &str, metrics: Option<UsageMetrics>) {
+        match id {
+            SRC_HOOK => self.hook = metrics,
+            SRC_LOGS => self.logs = metrics,
+            SRC_SYNC => self.sync = metrics,
+            _ => {}
+        }
+    }
+
     /// Selecciona la fuente activa por prioridad (hook > logs > sync),
     /// prefiriendo siempre datos no-stale; si todos están stale, devuelve el
     /// de mayor prioridad disponible.

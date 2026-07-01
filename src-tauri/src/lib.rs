@@ -22,6 +22,7 @@ mod commands;
 mod local_file_watcher;
 pub mod paths;
 mod poller;
+mod providers;
 mod schema_watch;
 mod state;
 mod tray;
