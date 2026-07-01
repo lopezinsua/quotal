@@ -5,6 +5,42 @@ All notable changes to Quotal are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] — 2026-07-01
+
+### Added
+- **Light & dark themes** plus a **pickable accent color** (green / blue / violet
+  / amber), from the Settings panel. Applied live, no restart.
+- **Desktop notifications** when your session or weekly usage crosses a
+  **configurable threshold** (75–95%). Opt-in, with edge detection so it warns
+  once per window and never spams on startup.
+- **Read-only / observer mode**: a switch that stops Quotal writing anything back
+  (OAuth token refresh write-back and hook installs), for users who want a purely
+  passive widget.
+- **Actionable schema-drift banner**: when Claude Code changes a data format
+  Quotal no longer recognises, the banner now offers to check for a Quotal update
+  and shows the observed Claude Code version.
+
+### Changed
+- **Resilience**: the context watcher falls back to polling when the OS file
+  watcher (`notify`) is unavailable, and the `statusLine` wrapper is regenerated
+  on startup so it keeps pointing at the current executable after an update.
+
+### Security
+- Every release now publishes a **`SHA256SUMS.txt`** so you can verify your
+  installer hasn't been tampered with before running it.
+
+## [0.3.2] — 2026-06-30
+
+### Changed
+- Restored the v0.3.1 window morph (240 ms, ease-in-out) and made the pill **ring**
+  style reflect the live session percentage.
+- The periodic refresh now pauses while the window is hidden, and deferred
+  settings are flushed, to cut idle work.
+
+### Fixed
+- Claude Code hooks are **auto-repaired on startup**, re-pointing the
+  open/close launchers at the current executable path if the app moved or updated.
+
 ## [0.3.1] — 2026-06-28
 
 ### Changed
@@ -77,5 +113,9 @@ Initial release.
 - Remembers position and size, snaps to screen edges, resizes proportionally.
 - Cross-platform installers (Windows, macOS, Linux) built automatically on tag.
 
+[0.3.3]: https://github.com/lopezinsua/quotal/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/lopezinsua/quotal/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/lopezinsua/quotal/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/lopezinsua/quotal/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/lopezinsua/quotal/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lopezinsua/quotal/releases/tag/v0.1.0
