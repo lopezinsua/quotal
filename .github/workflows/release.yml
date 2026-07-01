@@ -64,7 +64,7 @@ jobs:
     env:
       WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Dependencias nativas de WebKitGTK + bandeja del sistema (solo Linux).
       - name: Instalar dependencias de Linux
@@ -88,7 +88,7 @@ jobs:
           workspaces: "./src-tauri -> target"
 
       - name: Configurar Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
@@ -122,7 +122,7 @@ jobs:
           Write-Host "Firma de Windows configurada con la huella $($cert.Thumbprint)"
 
       - name: Compilar y publicar Release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Firma del AUTO-UPDATER (minisign, gratis — NO es la firma del SO).
