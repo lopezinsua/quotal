@@ -807,3 +807,158 @@ mod tests {
         assert!(existing_foreign_command(&json!({})).is_none());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests de INTEGRACIÓN de los hooks contra un `settings.json` REAL en disco.
+// Es lo que toca el fichero del usuario: un fallo aquí rompe SUS hooks. Aquí
+// verificamos el ciclo completo instalar→desinstalar sobre un HOME temporal
+// (nunca el `.claude` real), comprobando que:
+//   - se preserva CUALQUIER hook ajeno bajo el mismo evento,
+//   - desinstalar restaura el `settings.json` EXACTAMENTE como estaba,
+//   - instalar es idempotente.
+//
+// Tocan env vars globales (HOME/USERPROFILE vía `paths`), así que van `#[serial]`.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod fs_tests {
+    use super::*;
+    use serde_json::json;
+    use serial_test::serial;
+    use std::path::Path;
+
+    fn set_home(dir: &Path) {
+        std::env::set_var("HOME", dir);
+        std::env::set_var("USERPROFILE", dir);
+    }
+
+    fn teardown() {
+        std::env::remove_var("HOME");
+        std::env::remove_var("USERPROFILE");
+    }
+
+    fn write_settings(dir: &Path, v: &Value) {
+        let claude = dir.join(".claude");
+        std::fs::create_dir_all(&claude).unwrap();
+        std::fs::write(claude.join("settings.json"), serde_json::to_string_pretty(v).unwrap())
+            .unwrap();
+    }
+
+    fn read_settings_value(dir: &Path) -> Value {
+        let raw = std::fs::read_to_string(dir.join(".claude/settings.json")).unwrap();
+        serde_json::from_str(&raw).unwrap()
+    }
+
+    #[test]
+    #[serial]
+    fn autostart_roundtrip_preserva_hooks_ajenos_y_restaura_exacto() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        // Estado de partida: un hook AJENO del usuario bajo el MISMO evento + otra clave.
+        let original = json!({
+            "hooks": { "SessionStart": [
+                { "hooks": [ { "type": "command", "command": "echo ajeno" } ] }
+            ] },
+            "model": "sonnet"
+        });
+        write_settings(tmp.path(), &original);
+
+        install_autostart_hook().unwrap();
+        assert!(is_autostart_installed(), "debería quedar instalado");
+        // El hook ajeno y la clave `model` siguen ahí.
+        let after = read_settings_value(tmp.path());
+        assert_eq!(after["model"], "sonnet");
+        let groups = after["hooks"]["SessionStart"].as_array().unwrap();
+        assert_eq!(groups.len(), 2, "ajeno + el nuestro");
+
+        uninstall_autostart_hook().unwrap();
+        assert!(!is_autostart_installed());
+        // Restauración EXACTA: igual (como Value) al `settings.json` de partida.
+        assert_eq!(read_settings_value(tmp.path()), original, "no se restauró exacto");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn autostart_install_es_idempotente() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        write_settings(tmp.path(), &json!({}));
+
+        install_autostart_hook().unwrap();
+        install_autostart_hook().unwrap(); // segunda vez: no debe duplicar
+
+        let s = read_settings_value(tmp.path());
+        let marked = s["hooks"]["SessionStart"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|g| group_has_marker(g, AUTOSTART_MARKER))
+            .count();
+        assert_eq!(marked, 1, "solo debe existir UN grupo nuestro");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn autostart_uninstall_sin_settings_no_falla_y_no_crea_hooks() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        // No hay settings.json: desinstalar no debe fallar (nada que quitar).
+        uninstall_autostart_hook().unwrap();
+        assert!(!is_autostart_installed());
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn statusline_bridge_envuelve_el_comando_ajeno_y_lo_restaura() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let original = json!({
+            "statusLine": { "type": "command", "command": "starship prompt" },
+            "other": 1
+        });
+        write_settings(tmp.path(), &original);
+
+        install_statusline_bridge().unwrap();
+        assert!(is_bridge_installed(), "el puente debería quedar instalado");
+        let after = read_settings_value(tmp.path());
+        // El comando ahora es el nuestro (lleva el marcador), y `other` se preserva.
+        let cmd = after["statusLine"]["command"].as_str().unwrap();
+        assert!(cmd.contains(BRIDGE_MARKER), "el comando debe ser el del puente: {cmd}");
+        assert_eq!(after["other"], 1);
+
+        uninstall_statusline_bridge().unwrap();
+        assert!(!is_bridge_installed());
+        // El statusLine original del usuario vuelve EXACTO, y `other` intacto.
+        assert_eq!(read_settings_value(tmp.path()), original, "no se restauró el statusLine ajeno");
+        // El backup del puente se limpia al desinstalar.
+        assert!(!paths::bridge_backup_path().exists(), "el backup debería borrarse");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn shutdown_roundtrip_preserva_ajenos_y_restaura_exacto() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let original = json!({
+            "hooks": { "SessionEnd": [
+                { "hooks": [ { "type": "command", "command": "echo bye-ajeno" } ] }
+            ] }
+        });
+        write_settings(tmp.path(), &original);
+
+        install_shutdown_hook().unwrap();
+        assert!(is_shutdown_installed());
+
+        uninstall_shutdown_hook().unwrap();
+        assert!(!is_shutdown_installed());
+        assert_eq!(read_settings_value(tmp.path()), original, "no se restauró exacto");
+
+        teardown();
+    }
+}
