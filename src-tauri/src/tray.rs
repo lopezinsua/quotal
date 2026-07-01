@@ -59,10 +59,9 @@ pub fn create_tray(app: &App<Wry>) -> tauri::Result<()> {
             // Click derecho: abre el menú nativo. Re-verificamos el texto del ítem
             // con la visibilidad REAL justo antes, por si la ventana se ocultó por
             // otra vía (la X del widget) sin pasar por toggle_window.
-            TrayIconEvent::Click {
-                button: MouseButton::Right,
-                ..
-            } => sync_toggle_label(tray.app_handle()),
+            TrayIconEvent::Click { button: MouseButton::Right, .. } => {
+                sync_toggle_label(tray.app_handle())
+            }
             _ => {}
         });
 
@@ -188,8 +187,7 @@ pub fn set_gauge(app: &AppHandle, remaining: Option<f64>, severity: &str, toolti
 /// `toggle_window`) para que el menú no se desincronice — p. ej. la X del widget,
 /// que oculta a la bandeja sin alternar desde aquí.
 pub fn sync_toggle_label(app: &AppHandle) {
-    let visible =
-        app.get_webview_window("main").and_then(|w| w.is_visible().ok()).unwrap_or(false);
+    let visible = app.get_webview_window("main").and_then(|w| w.is_visible().ok()).unwrap_or(false);
     if let Some(state) = app.try_state::<TrayState>() {
         let _ = state.toggle.set_text(if visible { HIDE_TEXT } else { SHOW_TEXT });
     }
