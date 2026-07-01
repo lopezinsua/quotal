@@ -39,6 +39,12 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
+      # Auditoría de dependencias JS. Quotal no envía NINGUNA dependencia npm al
+      # usuario (el frontend es JS vanilla servido como estáticos), así que esto
+      # solo protege la cadena de herramientas de build. Falla en severidad alta+.
+      - name: Auditoría de dependencias (npm audit)
+        run: npm audit --audit-level=high
+
   check:
     runs-on: ubuntu-22.04
     steps:
@@ -53,10 +59,16 @@ jobs:
             librsvg2-dev \
             libayatana-appindicator3-dev
 
-      - name: Configurar Rust (con rustfmt y clippy)
+      - name: Configurar Rust (con rustfmt, clippy y llvm-tools)
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
+
+      # Binarios precompilados (rápido, sin `cargo install`): cobertura + auditoría.
+      - name: Instalar cargo-llvm-cov y cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-audit
 
       - name: Caché de compilación de Rust
         uses: swatinem/rust-cache@v2
@@ -71,9 +83,17 @@ jobs:
         working-directory: ./src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Tests (cargo test)
+      # Auditoría de vulnerabilidades de las crates. Falla ante vulnerabilidades;
+      # los avisos informativos (unsound/unmaintained) NO tumban el build.
+      - name: Auditoría de dependencias (cargo audit)
         working-directory: ./src-tauri
-        run: cargo test --all
+        run: cargo audit
+
+      # Tests + cobertura en una pasada (instrumentada). El umbral impide que la
+      # cobertura de líneas baje del suelo actual sin que el CI lo note.
+      - name: Tests + cobertura (cargo llvm-cov)
+        working-directory: ./src-tauri
+        run: cargo llvm-cov --workspace --fail-under-lines 45 --summary-only
 
   # Compila en Windows y macOS para que el código tras `#[cfg(target_os = "...")]`
   # (SetWindowPos en Windows, Keychain en macOS) NO pueda romperse sin que el CI lo
