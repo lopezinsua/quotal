@@ -420,6 +420,36 @@ pub fn resync_installed_hooks() {
     if changed {
         let _ = write_atomic(&paths::settings_path(), &settings);
     }
+
+    // Regenera también el wrapper `.cjs` del puente statusLine (si está instalado),
+    // para propagar mejoras del wrapper a instalaciones antiguas. El `settings.json`
+    // no se toca: su comando apunta a la ruta fija del `.cjs`, que no cambia.
+    resync_statusline_script();
+}
+
+/// Comando ajeno original que el puente envolvió, leído del backup guardado al
+/// instalar. `None` si no había statusLine previo (o si por lo que sea el backup
+/// contuviera ya nuestro propio marcador, que nunca deberíamos re-envolver).
+fn backup_foreign_command() -> Option<String> {
+    let raw = std::fs::read_to_string(paths::bridge_backup_path()).ok()?;
+    let v: Value = serde_json::from_str(&raw).ok()?;
+    let cmd = v.get("previous")?.get("command")?.as_str()?.trim();
+    if cmd.is_empty() || cmd.contains(BRIDGE_MARKER) {
+        None
+    } else {
+        Some(cmd.to_string())
+    }
+}
+
+/// Si el puente statusLine está instalado, REGENERA su script `.cjs` con la lógica
+/// actual del wrapper, re-tomando el comando ajeno del backup. Así una instalación
+/// antigua recibe las mejoras del wrapper (igual que hacemos con los VBS de
+/// arranque/cierre). Best-effort: cualquier fallo se ignora.
+fn resync_statusline_script() {
+    if !is_bridge_installed() {
+        return;
+    }
+    let _ = write_statusline_script(backup_foreign_command().as_deref());
 }
 
 /// ¿Está instalado el auto-arranque con Claude Code?
@@ -958,6 +988,43 @@ mod fs_tests {
         // El backup del puente se limpia al desinstalar.
         assert!(!paths::bridge_backup_path().exists(), "el backup debería borrarse");
 
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn resync_regenera_el_script_del_puente_desde_el_backup() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        write_settings(
+            tmp.path(),
+            &json!({ "statusLine": { "type": "command", "command": "starship prompt" } }),
+        );
+        install_statusline_bridge().unwrap();
+
+        let script = statusline_script_path();
+        assert!(script.exists(), "el .cjs debe existir tras instalar");
+        // Simula una instalación antigua cuyo `.cjs` se perdió o quedó desfasado.
+        std::fs::remove_file(&script).unwrap();
+
+        // El resync de arranque debe regenerarlo re-tomando el comando ajeno del backup.
+        resync_installed_hooks();
+
+        let content = std::fs::read_to_string(&script).unwrap();
+        assert!(content.contains("starship prompt"), "debe re-embeber el comando ajeno: {content}");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn resync_sin_puente_no_crea_script() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        write_settings(tmp.path(), &json!({}));
+        // Sin puente instalado, el resync no debe crear ningún `.cjs`.
+        resync_installed_hooks();
+        assert!(!statusline_script_path().exists());
         teardown();
     }
 
