@@ -1000,4 +1000,152 @@ mod net_tests {
 
         teardown();
     }
+
+    // -- PR2: carrera de rotación del refresh_token y CAS de la reescritura. --
+
+    #[tokio::test]
+    #[serial]
+    async fn recover_with_fresh_creds_reintenta_con_el_token_del_fichero() {
+        // Simula la CARRERA DE ROTACIÓN: nuestro refresh falló porque Claude Code
+        // ya rotó el refresh_token y dejó en el fichero un access token NUEVO. La
+        // recuperación debe releer el fichero y reintentar el GET con ese token.
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        setup_home(tmp.path(), "acc-fresh", "ref", now_ms() + 3_600_000);
+
+        let server = MockServer::start_async().await;
+        let usage = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-fresh");
+                then.status(200)
+                    .json_body(json!({ "five_hour": { "utilization": 7.0, "resets_at": "x" } }));
+            })
+            .await;
+        std::env::set_var("QUOTAL_USAGE_URL", server.url("/usage"));
+
+        // El token que ya probamos ("acc-old") difiere del del fichero ("acc-fresh").
+        let resp = recover_with_fresh_creds(http_client(), "acc-old").await;
+        assert!(resp.is_some(), "debería recuperar con el token nuevo del fichero");
+        usage.assert_async().await;
+
+        teardown();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn recover_with_fresh_creds_none_si_el_token_no_cambio() {
+        // Si el fichero trae el MISMO token que ya falló, no hay nada nuevo que
+        // probar: devuelve None SIN gastar una petición (no hay mock declarado, así
+        // que cualquier GET fallaría el test por conexión rechazada).
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        setup_home(tmp.path(), "acc-same", "ref", now_ms() + 3_600_000);
+
+        let resp = recover_with_fresh_creds(http_client(), "acc-same").await;
+        assert!(resp.is_none(), "mismo token → None sin pedir red");
+
+        teardown();
+    }
+
+    /// Escribe un `.credentials.json` en el HOME temporal con el blob dado.
+    fn write_creds_raw(home: &Path, blob: serde_json::Value) {
+        let claude = home.join(".claude");
+        std::fs::create_dir_all(&claude).unwrap();
+        std::fs::write(claude.join(".credentials.json"), blob.to_string()).unwrap();
+    }
+
+    #[test]
+    #[serial]
+    fn persist_tokens_file_escribe_si_el_fichero_es_mas_viejo() {
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("HOME", tmp.path());
+        std::env::set_var("USERPROFILE", tmp.path());
+        // Fichero con expiry viejo + claves ajenas que NO debemos perder.
+        write_creds_raw(
+            tmp.path(),
+            json!({
+                "claudeAiOauth": { "accessToken": "old", "refreshToken": "r0", "expiresAt": 1000, "scopes": ["a"] },
+                "otra": 42
+            }),
+        );
+
+        let wrote = persist_tokens_file("new", "r1", 5000);
+        assert!(wrote, "debe escribir cuando el fichero es más viejo");
+
+        let v: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(tmp.path().join(".claude/.credentials.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(v["claudeAiOauth"]["accessToken"], "new");
+        assert_eq!(v["claudeAiOauth"]["refreshToken"], "r1");
+        assert_eq!(v["claudeAiOauth"]["expiresAt"], 5000);
+        assert_eq!(v["claudeAiOauth"]["scopes"][0], "a"); // preservado
+        assert_eq!(v["otra"], 42); // preservado
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn persist_tokens_file_no_pisa_si_claude_code_ya_refresco() {
+        // CAS: el fichero tiene un expiry IGUAL o MÁS NUEVO que el nuestro (Claude
+        // Code refrescó por su cuenta). No debemos pisarlo o invalidaríamos su token.
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("HOME", tmp.path());
+        std::env::set_var("USERPROFILE", tmp.path());
+        write_creds_raw(
+            tmp.path(),
+            json!({ "claudeAiOauth": { "accessToken": "cc-fresh", "refreshToken": "r-cc", "expiresAt": 9000 } }),
+        );
+
+        let wrote = persist_tokens_file("nuestro", "r-noso", 5000);
+        assert!(!wrote, "no debe pisar un token igual o más nuevo");
+
+        let raw = std::fs::read_to_string(tmp.path().join(".claude/.credentials.json")).unwrap();
+        assert!(raw.contains("cc-fresh"), "el token de Claude Code debe permanecer intacto");
+        assert!(!raw.contains("nuestro"), "nuestro token NO debió escribirse");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn persist_tokens_file_false_si_no_existe_el_fichero() {
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("HOME", tmp.path());
+        std::env::set_var("USERPROFILE", tmp.path());
+        // No creamos el fichero: no hay nada que mezclar → false (no escribe).
+        assert!(!persist_tokens_file("a", "b", 1), "sin fichero → false");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn effective_tokens_prefiere_el_mas_reciente() {
+        reset_token_cache_for_test();
+        let file = Creds {
+            access_token: "f".into(),
+            refresh_token: "rf".into(),
+            expires_at_ms: 100,
+            subscription_type: "pro".into(),
+        };
+
+        // Sin caché → usa el fichero.
+        assert_eq!(effective_tokens(&file).access, "f");
+
+        // Caché MÁS nueva que el fichero → gana la caché (la refrescamos nosotros).
+        store_cache(&Tokens { access: "c".into(), refresh: "rc".into(), expires_at_ms: 200 });
+        assert_eq!(effective_tokens(&file).access, "c");
+
+        // Caché MÁS vieja que el fichero → gana el fichero (Claude Code lo refrescó).
+        reset_token_cache_for_test();
+        store_cache(&Tokens { access: "c-old".into(), refresh: "rc".into(), expires_at_ms: 50 });
+        assert_eq!(effective_tokens(&file).access, "f");
+
+        reset_token_cache_for_test();
+    }
 }
