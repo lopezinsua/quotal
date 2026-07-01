@@ -93,6 +93,9 @@ pub struct MetricsPayload {
     /// Fuentes cuyo formato parece haber cambiado (deriva de esquema de Claude
     /// Code). `None` si todo parsea bien. La UI lo usa para avisar al usuario.
     pub schema_warning: Option<Vec<String>>,
+    /// Versión de Claude Code observada en el statusLine (p. ej. "2.1.197"), o
+    /// `None` si aún no se ha visto. La UI la muestra y contextualiza la deriva.
+    pub claude_code_version: Option<String>,
 }
 
 impl SharedState {
@@ -101,6 +104,7 @@ impl SharedState {
             active: self.active(),
             plan: self.plan.clone(),
             schema_warning: crate::schema_watch::warning(),
+            claude_code_version: crate::schema_watch::claude_version(),
         }
     }
 

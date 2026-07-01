@@ -103,6 +103,47 @@ if (el.updCheck) {
   });
 }
 
+// El aviso de DERIVA de esquema es accionable: la causa típica es que Claude Code
+// se actualizó a un formato más nuevo que el que soporta esta versión de Quotal,
+// así que al pulsar el banner comprobamos si hay actualización de Quotal. Si la
+// hay, mostramos el aviso rico (con botón de instalar); si no, un estado breve.
+if (el.schemaWarn) {
+  const checkFromDrift = async () => {
+    if (el.schemaWarn.dataset.checking === "1") return; // evita dobles clics
+    el.schemaWarn.dataset.checking = "1";
+    const original = el.schemaWarn.textContent;
+    el.schemaWarn.textContent = t("upd_checking");
+    try {
+      const status = await invoke("update_check");
+      if (status && status.available && status.version) {
+        el.schemaWarn.textContent = original;
+        showUpdate(status, true);
+      } else {
+        el.schemaWarn.textContent = status && status.error
+          ? t("upd_failed", { err: status.error })
+          : t("upd_uptodate");
+        setTimeout(() => {
+          el.schemaWarn.textContent = original;
+        }, 2500);
+      }
+    } catch (e) {
+      el.schemaWarn.textContent = t("upd_failed", { err: String(e) });
+      setTimeout(() => {
+        el.schemaWarn.textContent = original;
+      }, 2500);
+    } finally {
+      delete el.schemaWarn.dataset.checking;
+    }
+  };
+  el.schemaWarn.addEventListener("click", checkFromDrift);
+  el.schemaWarn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      checkFromDrift();
+    }
+  });
+}
+
 // Versión instalada, mostrada en ajustes.
 invoke("get_config")
   .then((c) => {

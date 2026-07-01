@@ -60,6 +60,7 @@
   "pin_fix": "Fijar desplegada",
   "plan": "Plan",
   "schema_warn": "⚠ Quotal podría no estar leyendo bien Claude Code (cambió: {src}). Busca una actualización.",
+  "schema_warn_hint": "Buscar una actualización de Quotal",
   "upd_available": "Actualización disponible: v{v}",
   "upd_install": "Actualizar",
   "upd_dismiss": "Descartar",
