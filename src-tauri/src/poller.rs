@@ -6,7 +6,7 @@
 //      respaldo offline del statusLine y conservación del último dato bueno.
 
 use crate::state::SharedHandle;
-use crate::{claude_code_bridge, claude_log_parser, local_file_watcher, paths, tray, usage_api};
+use crate::{paths, providers, tray, usage_api, SRC_HOOK, SRC_LOGS, SRC_SYNC};
 use std::path::Path;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -25,6 +25,17 @@ impl Dirty {
     fn any(&self) -> bool {
         self.hook || self.logs || self.sync
     }
+
+    /// ¿Está marcada como sucia la fuente con este `id` de proveedor? Permite que
+    /// el bucle de eventos itere el registro de `providers` sin conocer los campos.
+    fn is_set(&self, id: &str) -> bool {
+        match id {
+            SRC_HOOK => self.hook,
+            SRC_LOGS => self.logs,
+            SRC_SYNC => self.sync,
+            _ => false,
+        }
+    }
 }
 
 /// Marca la fuente afectada por una ruta. Comparamos por nombre de archivo /
@@ -39,12 +50,14 @@ fn classify(path: &Path, d: &mut Dirty) {
     }
 }
 
-/// Pobla las tres fuentes de una sola pasada (escaneo inicial al arrancar).
+/// Pobla todas las fuentes de una sola pasada (escaneo inicial al arrancar y en el
+/// respaldo por sondeo), iterando el registro de proveedores de contexto.
 fn refresh_all(shared: &SharedHandle) {
     if let Ok(mut state) = shared.lock() {
-        state.hook = claude_code_bridge::parse_capture();
-        state.logs = claude_log_parser::parse_latest();
-        state.sync = local_file_watcher::parse_sync();
+        for p in providers::all() {
+            let m = p.read();
+            state.set_context(p.id(), m);
+        }
     }
 }
 
@@ -164,19 +177,16 @@ pub(crate) fn spawn_watchers(app: AppHandle, shared: SharedHandle) {
             if !dirty.any() {
                 continue;
             }
-            // Parseamos FUERA del lock (es IO de disco) y luego asignamos rápido.
-            let hook = dirty.hook.then(claude_code_bridge::parse_capture);
-            let logs = dirty.logs.then(claude_log_parser::parse_latest);
-            let sync = dirty.sync.then(local_file_watcher::parse_sync);
+            // Parseamos FUERA del lock (es IO de disco): leemos solo las fuentes
+            // SUCIAS del registro y luego asignamos rápido bajo el lock.
+            let updates: Vec<_> = providers::all()
+                .into_iter()
+                .filter(|p| dirty.is_set(p.id()))
+                .map(|p| (p.id(), p.read()))
+                .collect();
             if let Ok(mut state) = shared.lock() {
-                if let Some(h) = hook {
-                    state.hook = h;
-                }
-                if let Some(l) = logs {
-                    state.logs = l;
-                }
-                if let Some(s) = sync {
-                    state.sync = s;
+                for (id, m) in updates {
+                    state.set_context(id, m);
                 }
             }
             emit_active(&app, &shared);
