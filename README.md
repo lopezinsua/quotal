@@ -260,6 +260,9 @@ On Linux you'll also need the WebKitGTK / app-indicator dev packages:
 sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf libayatana-appindicator3-dev
 ```
 
+Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) for the quality bar and
+how to extend Quotal, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the internals.
+
 ## Release
 
 Pushing a `vX.Y.Z` tag triggers the GitHub Actions workflow, which builds native
