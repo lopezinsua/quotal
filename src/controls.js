@@ -102,6 +102,14 @@ export async function applyVisualPrefs() {
       el.optStatusline.checked = !!on;
     })
     .catch((e) => console.error("statusline_status:", e));
+  // Modo solo-lectura: su estado vive en el backend (persistido). Al reflejarlo,
+  // deshabilitamos los toggles de hooks si está activo (instalarlos fallaría).
+  invoke("read_only_status")
+    .then((on) => {
+      if (el.optReadOnly) el.optReadOnly.checked = !!on;
+      setHookTogglesDisabled(!!on);
+    })
+    .catch((e) => console.error("read_only_status:", e));
   updatePinUi();
   try {
     await win.setAlwaysOnTop(prefs.onTop);
@@ -358,6 +366,29 @@ el.optStatusline.addEventListener("change", async () => {
     el.optStatusline.checked = !on; // revertir si falló
   }
 });
+
+// En modo solo-lectura, los toggles que ESCRIBEN en settings.json (los hooks) se
+// deshabilitan: instalarlos fallaría en el backend por diseño.
+function setHookTogglesDisabled(disabled) {
+  for (const c of [el.optAutostart, el.optClose, el.optStatusline]) {
+    if (c) c.disabled = disabled;
+  }
+}
+
+// Modo solo-lectura (observador): corta el write-back del token OAuth y el
+// instalado de hooks. Se persiste en el backend (fuente de verdad de la garantía).
+if (el.optReadOnly) {
+  el.optReadOnly.addEventListener("change", async () => {
+    const on = el.optReadOnly.checked;
+    try {
+      await invoke("set_read_only", { enabled: on });
+      setHookTogglesDisabled(on);
+    } catch (e) {
+      console.error("set_read_only:", e);
+      el.optReadOnly.checked = !on; // revertir si falló
+    }
+  });
+}
 
 // ---- Idioma ----
 // Primera opción: "Automático" (vuelve a la detección por SO, prefs.locale=null).

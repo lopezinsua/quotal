@@ -31,6 +31,8 @@
   "opt_autostart": "Abrir con Claude Code",
   "opt_close": "Cerrar con Claude Code",
   "opt_statusline": "Contexto oficial (statusLine)",
+  "opt_readonly": "Modo solo-lectura (observador)",
+  "opt_readonly_hint": "Nunca reescribe tu token ni instala hooks",
   "opt_notify": "Avisarme cerca del límite",
   "opt_notify_at": "Avisar al",
   "notify_title": "Quotal — aviso de uso",

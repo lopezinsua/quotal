@@ -59,10 +59,21 @@ pub async fn refresh_plan(app: AppHandle, state: State<'_, SharedHandle>) -> Res
     Ok(())
 }
 
+/// Error devuelto cuando una acción de ESCRITURA se intenta en modo solo-lectura.
+/// El frontend revierte el toggle y puede mostrarlo.
+fn read_only_guard() -> Result<(), String> {
+    if crate::app_config::is_read_only() {
+        Err("modo solo-lectura activo: Quotal no modifica settings.json".into())
+    } else {
+        Ok(())
+    }
+}
+
 /// Instala el auto-arranque: hook `SessionStart` que abre el widget al iniciar
 /// Claude Code en la terminal.
 #[tauri::command]
 pub fn install_autostart() -> Result<(), String> {
+    read_only_guard()?;
     claude_code_bridge::install_autostart_hook()
 }
 
@@ -82,6 +93,7 @@ pub fn autostart_status() -> bool {
 /// Claude Code en la terminal.
 #[tauri::command]
 pub fn install_shutdown() -> Result<(), String> {
+    read_only_guard()?;
     claude_code_bridge::install_shutdown_hook()
 }
 
@@ -105,7 +117,21 @@ pub fn statusline_status() -> bool {
 
 #[tauri::command]
 pub fn install_statusline_bridge() -> Result<(), String> {
+    read_only_guard()?;
     claude_code_bridge::install_statusline_bridge()
+}
+
+/// Devuelve el estado del modo solo-lectura (observador).
+#[tauri::command]
+pub fn read_only_status() -> bool {
+    crate::app_config::is_read_only()
+}
+
+/// Activa/desactiva el modo solo-lectura y lo persiste. En ON, Quotal deja de
+/// reescribir el token OAuth y de instalar hooks.
+#[tauri::command]
+pub fn set_read_only(enabled: bool) {
+    crate::app_config::set_read_only(enabled);
 }
 
 #[tauri::command]
@@ -289,6 +315,7 @@ pub fn get_config(state: State<'_, SharedHandle>) -> serde_json::Value {
             "sync_file": paths::sync_path().to_string_lossy(),
         },
         "bridge_installed": claude_code_bridge::is_bridge_installed(),
+        "read_only": crate::app_config::is_read_only(),
         "active_mode": active.source,
         "active_metrics": active,
     })
