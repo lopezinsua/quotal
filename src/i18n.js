@@ -72,6 +72,8 @@ const BASE = {
   opt_autostart: "Open with Claude Code",
   opt_close: "Close with Claude Code",
   opt_statusline: "Official context (statusLine)",
+  opt_readonly: "Read-only mode (observer)",
+  opt_readonly_hint: "Never writes back your token or installs hooks",
   opt_notify: "Notify me near the limit",
   opt_notify_at: "Notify at",
   notify_title: "Quotal — usage alert",

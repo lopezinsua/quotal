@@ -509,6 +509,12 @@ fn persist_tokens_keychain(access: &str, refresh: &str, expires_at_ms: i64) {
 /// Persiste los tokens nuevos allí donde Claude Code los lee, según el SO:
 /// fichero en Windows/Linux (y macOS con fallback de fichero), Keychain en macOS.
 fn persist_tokens(access: &str, refresh: &str, expires_at_ms: i64) {
+    // Modo solo-lectura: NO tocamos las credenciales de Claude Code. El token
+    // refrescado sigue en la caché en memoria (así `/usage` funciona igual), pero
+    // no se reescribe en disco. Es la garantía de confianza del modo observador.
+    if crate::app_config::is_read_only() {
+        return;
+    }
     let wrote = persist_tokens_file(access, refresh, expires_at_ms);
     #[cfg(target_os = "macos")]
     if !wrote {
@@ -893,6 +899,9 @@ mod net_tests {
     fn setup_home(dir: &Path, access: &str, refresh: &str, expires_at_ms: i64) {
         std::env::set_var("HOME", dir);
         std::env::set_var("USERPROFILE", dir);
+        // Parte SIEMPRE de solo-lectura = OFF, para que una fuga de un test previo
+        // (p. ej. un panic antes de su teardown) no bloquee el write-back aquí.
+        crate::app_config::set_read_only(false);
         let claude = dir.join(".claude");
         std::fs::create_dir_all(&claude).unwrap();
         let blob = json!({
@@ -1044,6 +1053,54 @@ mod net_tests {
         let resp = recover_with_fresh_creds(http_client(), "acc-same").await;
         assert!(resp.is_none(), "mismo token → None sin pedir red");
 
+        teardown();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn read_only_no_reescribe_credenciales_pero_sigue_funcionando() {
+        // GARANTÍA del modo observador: ante un 401 refrescamos el token EN MEMORIA
+        // y `/usage` funciona, pero el fichero `.credentials.json` NO se toca.
+        reset_token_cache_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        setup_home(tmp.path(), "acc-expired", "ref-1", now_ms() + 3_600_000);
+        crate::app_config::set_read_only(true);
+
+        let server = MockServer::start_async().await;
+        let _u401 = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-expired");
+                then.status(401);
+            })
+            .await;
+        let _tok = server
+            .mock_async(|when, then| {
+                when.method(POST).path("/token");
+                then.status(200).json_body(json!({
+                    "access_token": "acc-new", "refresh_token": "ref-2", "expires_in": 3600
+                }));
+            })
+            .await;
+        let _uok = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage").header("Authorization", "Bearer acc-new");
+                then.status(200)
+                    .json_body(json!({ "five_hour": { "utilization": 3.0, "resets_at": "x" } }));
+            })
+            .await;
+        std::env::set_var("QUOTAL_USAGE_URL", server.url("/usage"));
+        std::env::set_var("QUOTAL_TOKEN_URL", server.url("/token"));
+
+        let info = fetch().await;
+        assert!(info.available, "debe funcionar igual; error={:?}", info.error);
+        assert_eq!(info.session_percent, Some(3.0));
+
+        // El fichero conserva el token VIEJO: no hubo write-back.
+        let creds = std::fs::read_to_string(tmp.path().join(".claude/.credentials.json")).unwrap();
+        assert!(creds.contains("acc-expired"), "no debió reescribirse el token: {creds}");
+        assert!(!creds.contains("acc-new"), "el token nuevo NO debe llegar al disco");
+
+        crate::app_config::set_read_only(false); // limpia el global para otros tests
         teardown();
     }
 

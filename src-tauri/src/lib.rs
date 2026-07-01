@@ -15,6 +15,7 @@
 // Ningún watcher ni sondeo bloquea el hilo de la UI: todo vive en tareas de
 // `tauri::async_runtime` (tokio).
 
+mod app_config;
 mod claude_code_bridge;
 mod claude_log_parser;
 mod commands;
@@ -95,6 +96,9 @@ pub fn run() {
                 "Quotal v{} arrancando (logs en el dir de logs del SO)",
                 env!("CARGO_PKG_VERSION")
             );
+            // Carga la preferencia de solo-lectura ANTES de arrancar el poller: si
+            // está activa, ni el primer refresco de token podrá escribir en disco.
+            app_config::load();
             tray::create_tray(app)?;
             // Auto-reparación de los hooks de Claude Code: re-sincroniza los
             // scripts de auto-arranque/auto-cierre con la ruta ACTUAL del exe, por
@@ -124,6 +128,8 @@ pub fn run() {
             commands::statusline_status,
             commands::install_statusline_bridge,
             commands::uninstall_statusline_bridge,
+            commands::read_only_status,
+            commands::set_read_only,
             commands::set_tray_static,
             commands::hide_to_tray,
             commands::set_bounds,
