@@ -5,6 +5,10 @@
 > Documento de trabajo orientado a desarrolladores. El "Roadmap" del README es la
 > versión de cara al usuario (features visibles); **este** documento es el plan
 > técnico interno: qué tocar, por qué, y en qué orden por impacto/riesgo.
+>
+> Para entender cómo está construido Quotal (tuberías de datos, el punto de
+> extensión `ContextProvider`, el contrato de datos y la superficie IPC), ver
+> [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Principios
 
