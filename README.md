@@ -131,7 +131,8 @@ Grab the installer for your OS from the [latest release](https://github.com/lope
 > [!NOTE]
 > **Why the "unidentified developer" warning?** Quotal isn't code-signed yet — a signing
 > certificate is a recurring paid subscription, and as a free MIT project it doesn't have
-> one (a free OSS certificate via SignPath is being pursued). The warning is your OS being
+> one (a free OSS certificate via SignPath is being pursued — see
+> [docs/SIGNING.md](docs/SIGNING.md) for the full status). The warning is your OS being
 > cautious about *unknown* publishers, **not** a sign anything is wrong. You can verify the
 > download yourself with the published [`SHA256SUMS.txt`](#verify-your-download), and every
 > in-app **auto-update is cryptographically signed** (see below). To run it:
