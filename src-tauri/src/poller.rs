@@ -55,6 +55,27 @@ fn emit_active(app: &AppHandle, shared: &SharedHandle) {
     }
 }
 
+/// Cada cuánto reparsear las fuentes en el modo de RESPALDO por sondeo (cuando
+/// `notify` no está disponible). Más frecuente que el sondeo del plan porque el
+/// contexto cambia en tiempo real; sigue siendo barato (solo lee colas de ficheros).
+const POLL_FALLBACK: Duration = Duration::from_secs(5);
+
+/// Bucle de respaldo por SONDEO para cuando `notify` no puede vigilar los ficheros
+/// (no se pudo crear el watcher, o el SO rechazó registrar los watches — p. ej. al
+/// agotar los límites de inotify en Linux). Menos eficiente que los eventos, pero
+/// garantiza que la UI SIGA actualizándose en vez de congelarse en silencio.
+async fn poll_loop(app: AppHandle, shared: SharedHandle) {
+    log::warn!(
+        "[watcher] respaldo por sondeo activo (cada {}s): notify no disponible",
+        POLL_FALLBACK.as_secs()
+    );
+    loop {
+        tokio::time::sleep(POLL_FALLBACK).await;
+        refresh_all(&shared);
+        emit_active(&app, &shared);
+    }
+}
+
 /// Monta los watchers de `notify` y la tarea consumidora. No bloquea el hilo
 /// principal: todo corre dentro de `tauri::async_runtime`.
 pub(crate) fn spawn_watchers(app: AppHandle, shared: SharedHandle) {
@@ -81,21 +102,34 @@ pub(crate) fn spawn_watchers(app: AppHandle, shared: SharedHandle) {
             }) {
                 Ok(w) => w,
                 Err(e) => {
+                    // Sin watcher no hay eventos: caemos al respaldo por sondeo en
+                    // vez de quedarnos sin actualizar el contexto para siempre.
                     log::error!("[watcher] no se pudo crear el watcher de notify: {e}");
+                    poll_loop(app, shared).await;
                     return;
                 }
             };
 
         // Vigilamos el directorio del widget (sync.json + captura del hook) y,
         // si existe, el de historial. NonRecursive basta para el primero;
-        // Recursive para historial por si hay subcarpetas.
-        if let Err(e) = watcher.watch(&paths::widget_dir(), RecursiveMode::NonRecursive) {
-            log::warn!("[watcher] widget_dir: {e}");
+        // Recursive para historial por si hay subcarpetas. Registramos si AL MENOS
+        // uno se pudo vigilar; si ninguno (p. ej. límites de inotify agotados),
+        // caemos al respaldo por sondeo.
+        let mut watched = false;
+        match watcher.watch(&paths::widget_dir(), RecursiveMode::NonRecursive) {
+            Ok(()) => watched = true,
+            Err(e) => log::warn!("[watcher] widget_dir: {e}"),
         }
         if paths::projects_dir().exists() {
-            if let Err(e) = watcher.watch(&paths::projects_dir(), RecursiveMode::Recursive) {
-                log::warn!("[watcher] projects_dir: {e}");
+            match watcher.watch(&paths::projects_dir(), RecursiveMode::Recursive) {
+                Ok(()) => watched = true,
+                Err(e) => log::warn!("[watcher] projects_dir: {e}"),
             }
+        }
+        if !watched {
+            log::error!("[watcher] ningún directorio vigilable; respaldo por sondeo");
+            poll_loop(app, shared).await;
+            return;
         }
 
         // `watcher` debe seguir vivo mientras dure el bucle: lo retenemos aquí.
