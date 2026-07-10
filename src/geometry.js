@@ -4,7 +4,7 @@
 // cálculo del tope que cabe en pantalla, el zoom NATIVO del contenido, el factor
 // de escala cacheado y el selector de monitor.
 
-import { win, webview, currentMonitor, primaryMonitor } from "./tauri.js";
+import { win, webview, currentMonitor, primaryMonitor, availableMonitors } from "./tauri.js";
 import { fullSize, SIZE_FULL_DEFAULT } from "./prefs.js";
 
 // Escala del contenido. El lienzo (#full) mide BASE fijo y se reescala con el
@@ -69,6 +69,51 @@ export function applyZoom(s) {
   if (webview && webview.setZoom) {
     webview.setZoom(z).catch((e) => console.error("setZoom:", e));
   }
+}
+
+// --- Snap a bordes ---------------------------------------------------------
+// Distancia (lógica) a un borde a partir de la cual la ventana se PEGA a él al
+// soltar el arrastre, y margen que deja respecto al borde (el mismo que usa el
+// selector de posición, para que ambos caminos dejen la ventana igual).
+export const SNAP_DIST = 28;
+export const SNAP_MARGIN = 12;
+
+// Cálculo PURO del snap: dado el top-left físico, el tamaño físico y el área del
+// monitor (física), devuelve el top-left ya alineado a los bordes que queden a
+// menos de SNAP_DIST (o el mismo punto si no hay ninguno cerca). Un hueco
+// NEGATIVO (ventana medio fuera) también cuenta como "cerca": el snap la re-mete.
+export function snapTopLeft(pos, size, area, scale) {
+  const s = scale || 1;
+  const dist = SNAP_DIST * s;
+  const m = Math.round(SNAP_MARGIN * s);
+  const left = area.position.x;
+  const top = area.position.y;
+  const right = left + area.size.width;
+  const bottom = top + area.size.height;
+  let { x, y } = pos;
+  if (pos.x - left < dist) x = left + m;
+  else if (right - (pos.x + size.width) < dist) x = right - size.width - m;
+  if (pos.y - top < dist) y = top + m;
+  else if (bottom - (pos.y + size.height) < dist) y = bottom - size.height - m;
+  return { x: Math.round(x), y: Math.round(y) };
+}
+
+// Monitor que CONTIENE el punto físico (x, y), o null si ninguno. Permite
+// restaurar un ancla guardada en SU monitor: en el arranque la ventana puede
+// nacer en otro, y acotar el ancla al monitor equivocado la arrastraría allí
+// (configuraciones multi-monitor).
+export async function monitorFromPoint(x, y) {
+  try {
+    const mons = await availableMonitors();
+    for (const m of mons || []) {
+      const inX = x >= m.position.x && x < m.position.x + m.size.width;
+      const inY = y >= m.position.y && y < m.position.y + m.size.height;
+      if (inX && inY) return m;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
 }
 
 // Monitor donde está la ventana; si falla, el primario.

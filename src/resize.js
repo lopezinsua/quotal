@@ -65,9 +65,10 @@ async function settleResize(w, h) {
       if (nx !== pos.x || ny !== pos.y) {
         await setPos(new PhysicalPosition(Math.round(nx), Math.round(ny)));
       }
-      if (prefs.rememberPosition) {
-        prefs.position = await readAnchor();
-      }
+      // El ancla SIEMPRE sigue a la ventana tras un resize (es la fuente de
+      // verdad del cambio píldora↔completo); "recordar posición" solo gobierna
+      // si se restaura al arrancar.
+      prefs.position = (await readAnchor()) || prefs.position;
     }
   } catch (e) {
     console.error("settleResize:", e);

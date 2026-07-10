@@ -15,7 +15,7 @@ import { el } from "./dom.js";
 import { prefs, pillSize } from "./prefs.js";
 import { ui } from "./state.js";
 import { fitMaxScale, fullSizeFor, applyZoom, BASE_W, BASE_H, FULL_MIN, getSF } from "./geometry.js";
-import { normAnchor, readAnchor, anchorToTopLeft, setBounds } from "./anchor.js";
+import { normAnchor, readAnchor, anchorToTopLeft, anchorMonitor, setBounds } from "./anchor.js";
 
 // API pública re-exportada (la usan controls.js / main.js sin cambios).
 export { setPos, gridTarget, anchorPosition, captureAnchor, restorePosition } from "./anchor.js";
@@ -76,9 +76,14 @@ async function applyLayoutOnce() {
   }
 
   try {
-    // Tope REAL acotado al monitor actual: ni el tamaño guardado ni el máximo pueden
+    // Monitor de REFERENCIA: el del ancla (donde la ventana va a estar). En marcha
+    // coincide con el actual; en el arranque puede no coincidir (multi-monitor), y
+    // acotar contra el actual arrastraría el ancla al monitor equivocado.
+    const anchor = normAnchor(prefs.position) || (await readAnchor());
+    const mon =
+      (anchor && (await anchorMonitor(anchor))) || (await currentMonitor().catch(() => null));
+    // Tope REAL acotado a ese monitor: ni el tamaño guardado ni el máximo pueden
     // hacer que la ventana rebase la pantalla.
-    const mon = await currentMonitor().catch(() => null);
     const fit = fitMaxScale(mon);
     const fullDims = fullSizeFor(mon);
     const pill = pillSize();
@@ -93,7 +98,6 @@ async function applyLayoutOnce() {
     const sf = (mon && mon.scaleFactor) || getSF() || 1;
     const physW = Math.round(target.w * sf);
     const physH = Math.round(target.h * sf);
-    const anchor = normAnchor(prefs.position) || (await readAnchor());
     const tl = anchor ? await anchorToTopLeft(anchor, physW, physH, mon) : null;
 
     if (animate && tl) {
