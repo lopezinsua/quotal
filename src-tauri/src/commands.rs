@@ -222,10 +222,13 @@ pub fn set_bounds(app: AppHandle, x: i32, y: i32, w: u32, h: u32) -> Result<(), 
 pub fn primary_button_down() -> bool {
     #[cfg(windows)]
     {
-        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON,
+        };
         use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_SWAPBUTTON};
         // Con botones intercambiados, el "primario" físico es el derecho.
-        let vk = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 { VK_RBUTTON } else { VK_LBUTTON };
+        let vk =
+            if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 { VK_RBUTTON } else { VK_LBUTTON };
         // Bit alto activo = tecla/botón pulsado ahora mismo.
         (unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8000) != 0
     }
