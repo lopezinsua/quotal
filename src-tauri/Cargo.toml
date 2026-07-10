@@ -41,6 +41,9 @@ windows = { version = "0.61", features = [
     # timeBeginPeriod/timeEndPeriod: sube la resolución del temporizador durante
     # la animación de la píldora para que los frames sean uniformes (sin tirones).
     "Win32_Media",
+    # GetAsyncKeyState: saber si el botón primario sigue pulsado durante el
+    # arrastre nativo (el respaldo de fin de arrastre NO debe saltar a medias).
+    "Win32_UI_Input_KeyboardAndMouse",
 ] }
 
 # Dependencias SOLO de test (no entran en el binario de release). `httpmock`

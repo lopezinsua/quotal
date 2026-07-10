@@ -211,6 +211,30 @@ pub fn set_bounds(app: AppHandle, x: i32, y: i32, w: u32, h: u32) -> Result<(), 
     }
 }
 
+/// ¿Sigue pulsado el botón primario del ratón? Lo consulta el respaldo de fin
+/// de arrastre del frontend: durante el arrastre NATIVO el webview no recibe
+/// eventos de puntero, así que una pausa sin `onMoved` es indistinguible de un
+/// soltado que el SO se tragó — salvo preguntándole al SO por el botón. Tiene
+/// en cuenta los botones intercambiados (SM_SWAPBUTTON): VK_LBUTTON es el botón
+/// FÍSICO izquierdo, no el primario lógico. En plataformas sin API equivalente
+/// devuelve `false` (el respaldo actúa como hasta ahora).
+#[tauri::command]
+pub fn primary_button_down() -> bool {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
+        use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_SWAPBUTTON};
+        // Con botones intercambiados, el "primario" físico es el derecho.
+        let vk = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 { VK_RBUTTON } else { VK_LBUTTON };
+        // Bit alto activo = tecla/botón pulsado ahora mismo.
+        (unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8000) != 0
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 /// Generación de animación: cada nueva animación incrementa el contador y el
 /// hilo en curso se detiene si deja de ser el actual (cancela animaciones
 /// superpuestas al alternar modos rápido, evitando que dos peleen por el tamaño).

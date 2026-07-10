@@ -503,10 +503,18 @@ fn shutdown_script_path() -> PathBuf {
     paths::widget_dir().join("claude-usage-widget-shutdown.vbs")
 }
 
-/// Escribe un VBScript que cierra el widget SIN abrir consola, relanzándolo con
-/// `--quit`: la instancia única viva recibe la señal (vía single-instance) y se
-/// cierra de forma LIMPIA guardando su estado, en vez de un `taskkill /F` que la
-/// mataba sin guardar. Lanzado oculto por `wscript`. Devuelve su ruta.
+/// Escribe un VBScript que cierra el widget SIN abrir consola, y SOLO cuando la
+/// sesión que termina era la ÚLTIMA de Claude Code viva. Con varias sesiones a
+/// la vez (una en la terminal y otra en el IDE, o un `claude -p` suelto), el
+/// `SessionEnd` de una NO debe llevarse el widget mientras queden otras.
+///
+/// Dos fases, porque Claude Code espera a que el comando del hook termine y no
+/// queremos retrasar su salida: sin argumentos, el script se relanza a sí mismo
+/// desacoplado y devuelve el control YA; la copia diferida espera a que la
+/// sesión saliente muera del todo, cuenta las sesiones que quedan (`claude.exe`
+/// nativo o `node` ejecutando claude-code, vía WMI) y solo si no queda ninguna
+/// relanza el widget con `--quit` para el cierre LIMPIO vía single-instance
+/// (guardando estado). Si WMI fallara, cierra igual (el comportamiento clásico).
 fn write_shutdown_script() -> Result<PathBuf, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_str = exe.to_string_lossy().to_string();
@@ -517,7 +525,21 @@ fn write_shutdown_script() -> Result<PathBuf, String> {
     // comillas + argumento). Las comillas dobles internas se escriben como `""`.
     let vbs = format!(
         "Set sh = CreateObject(\"WScript.Shell\")\r\n\
-         sh.Run \"\"\"{exe_str}\"\" --quit\", 0, False\r\n"
+         If WScript.Arguments.Count = 0 Then\r\n\
+         \x20 ' Fase 1: relanzarse desacoplado y devolver el control a Claude Code ya.\r\n\
+         \x20 sh.Run \"wscript //B \"\"\" & WScript.ScriptFullName & \"\"\" deferred\", 0, False\r\n\
+         \x20 WScript.Quit\r\n\
+         End If\r\n\
+         ' Fase 2 (diferida): deja salir del todo a la sesion que termina.\r\n\
+         WScript.Sleep 3000\r\n\
+         ' Quedan otras sesiones de Claude Code vivas? Entonces el widget se queda.\r\n\
+         n = 0\r\n\
+         On Error Resume Next\r\n\
+         Set svc = GetObject(\"winmgmts:\\\\.\\root\\cimv2\")\r\n\
+         Set procs = svc.ExecQuery(\"SELECT ProcessId FROM Win32_Process WHERE Name='claude.exe' OR (Name='node.exe' AND CommandLine LIKE '%claude-code%')\")\r\n\
+         If Err.Number = 0 Then n = procs.Count\r\n\
+         On Error GoTo 0\r\n\
+         If n = 0 Then sh.Run \"\"\"{exe_str}\"\" --quit\", 0, False\r\n"
     );
 
     let path = shutdown_script_path();
@@ -541,9 +563,15 @@ fn build_shutdown_command() -> Result<String, String> {
         // Relanza el exe con `--quit`: la instancia viva lo recibe vía
         // single-instance y se cierra LIMPIAMENTE (no `pkill`, que la mataría sin
         // guardar y por patrón de ruta podría alcanzar procesos no deseados).
+        // Igual que en Windows: DESACOPLADO (`&`, el hook devuelve el control ya)
+        // y solo si, tras dejar salir a la sesión que termina, no queda ninguna
+        // otra sesión de Claude Code viva (`claude` nativo o node con claude-code;
+        // el patrón `[c]laude-code` evita que el propio comando se auto-detecte).
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let exe_str = exe.to_string_lossy().to_string();
-        Ok(format!("sh -c '\"{exe_str}\" --quit >/dev/null 2>&1' # {SHUTDOWN_MARKER}"))
+        Ok(format!(
+            "sh -c '( sleep 3; {{ pgrep -x claude || pgrep -f \"[c]laude-code\"; }} >/dev/null 2>&1 || \"{exe_str}\" --quit >/dev/null 2>&1 ) >/dev/null 2>&1 &' # {SHUTDOWN_MARKER}"
+        ))
     }
 }
 

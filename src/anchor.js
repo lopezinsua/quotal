@@ -12,7 +12,7 @@
 import { invoke, win, currentMonitor, availableMonitors, PhysicalPosition } from "./tauri.js";
 import { prefs, savePrefs, fullSize, pillSize } from "./prefs.js";
 import { ui } from "./state.js";
-import { clamp, pickMonitor, getSF } from "./geometry.js";
+import { clamp, pickMonitor, getSF, monitorFromPoint, snapTopLeft } from "./geometry.js";
 
 // Silencia el guardado de posición durante un breve margen tras un movimiento
 // PROPIO (set_bounds / setPosition), para que no se confunda con un arrastre del
@@ -68,6 +68,18 @@ export async function readAnchor() {
   }
 }
 
+// Monitor al que pertenece un ancla: el que CONTIENE su esquina (con un empujón
+// de 1px hacia dentro, porque un ancla derecha/inferior pegada al borde cae
+// justo EN la frontera del monitor). Si ninguno la contiene, el de la ventana.
+// Es el monitor correcto para acotar/escalar al restaurar o cambiar de modo: el
+// ACTUAL de la ventana puede ser otro en el arranque (multi-monitor) y usarlo
+// arrastraría el ancla hasta él.
+export async function anchorMonitor(anchor) {
+  const px = anchor.x - (anchor.right ? 1 : 0);
+  const py = anchor.y - (anchor.bottom ? 1 : 0);
+  return (await monitorFromPoint(px, py)) || (await pickMonitor());
+}
+
 // Deriva el top-left FÍSICO para un tamaño FÍSICO manteniendo FIJA la esquina
 // anclada (el widget crece/encoge hacia el interior). Acota al monitor por si
 // acaso (normalmente no hace falta: ya crece hacia dentro).
@@ -100,6 +112,28 @@ export async function setBounds(x, y, w, h) {
 export async function setPos(p) {
   suppressSaves();
   await win.setPosition(p);
+}
+
+// "Snap" a bordes documentado: si al soltar un arrastre la ventana quedó cerca
+// de un borde de pantalla (o medio fuera), se alinea a ese borde con el margen
+// estándar. Usa el área de TRABAJO del monitor si la API la expone (así no se
+// mete bajo la barra de tareas); si no, el monitor completo. Lo llama drag.js
+// al terminar el gesto, ANTES de capturar el ancla.
+export async function snapToEdges() {
+  try {
+    const mon = await currentMonitor().catch(() => null);
+    if (!mon) return;
+    const pos = await win.outerPosition();
+    const size = await win.outerSize();
+    const area =
+      mon.workArea && mon.workArea.size ? mon.workArea : { position: mon.position, size: mon.size };
+    const tl = snapTopLeft(pos, size, area, mon.scaleFactor || 1);
+    if (tl.x !== pos.x || tl.y !== pos.y) {
+      await setPos(new PhysicalPosition(tl.x, tl.y));
+    }
+  } catch (e) {
+    console.error("snapToEdges:", e);
+  }
 }
 
 // Captura el ancla de esquina actual y la persiste. La usan "recordar posición",
@@ -137,11 +171,13 @@ async function positionIsOnScreen(x, y, target) {
     if (m) mons = [m];
   }
   if (!mons.length) return false;
-  const scale = mons[0].scaleFactor || 1;
-  const tw = target.w * scale;
-  const th = target.h * scale;
   const edge = 8; // exige al menos esta porción visible
   return mons.some((m) => {
+    // El tamaño físico depende del factor de escala de CADA monitor (mezclar el
+    // del primero con la posición de otro falla en configuraciones de DPI mixto).
+    const scale = m.scaleFactor || 1;
+    const tw = target.w * scale;
+    const th = target.h * scale;
     const mx = m.position.x;
     const my = m.position.y;
     const mw = m.size.width;
@@ -157,8 +193,10 @@ export async function restorePosition() {
   try {
     const anchor = normAnchor(prefs.position);
     if (prefs.rememberPosition && anchor) {
-      // Restauramos sobre la MISMA esquina anclada (la píldora vuelve a su sitio).
-      const mon = await pickMonitor();
+      // Restauramos sobre la MISMA esquina anclada (la píldora vuelve a su sitio),
+      // acotando/escalando contra el monitor DEL ANCLA (no el de la ventana, que
+      // en el arranque todavía es el de nacimiento).
+      const mon = await anchorMonitor(anchor);
       const sf = (mon && mon.scaleFactor) || getSF() || 1;
       const physW = Math.round(target.w * sf);
       const physH = Math.round(target.h * sf);

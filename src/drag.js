@@ -8,12 +8,12 @@
 // con una red de seguridad (`pointermove` sin botones) por si el arrastre nativo del
 // SO se traga el `pointerup`.
 
-import { win, currentMonitor, LogicalSize } from "./tauri.js";
+import { invoke, win, currentMonitor, LogicalSize } from "./tauri.js";
 import { el } from "./dom.js";
-import { prefs, onFlushPrefs } from "./prefs.js";
+import { onFlushPrefs } from "./prefs.js";
 import { ui } from "./state.js";
 import { fullSizeFor, fitMaxScale, applyZoom, FULL_MIN, BASE_W, BASE_H } from "./geometry.js";
-import { captureAnchor, isSuppressed } from "./anchor.js";
+import { captureAnchor, isSuppressed, snapToEdges } from "./anchor.js";
 
 // Persistir la posición: en un arrastre REAL (`ui.moving`) o estando desplegada de
 // forma estable. Ignora reposicionamientos propios (suppress) y los reanclados al
@@ -23,20 +23,23 @@ let savePosTimer = null;
 let savePosPending = false; // hay un guardado de ancla con debounce sin vaciar?
 win.onMoved(() => {
   // Respaldo de fin de arrastre: si el SO se tragó el `pointerup`/`mouseup`, el
-  // movimiento se da por terminado tras un rato sin desplazarse. NO se dispara
-  // durante un arrastre normal (los eventos `onMoved` llegan sin parar) ni con el
-  // botón pulsado, así que no provoca el colapso a media maniobra.
+  // movimiento se da por terminado tras un rato sin desplazarse. Antes de darlo
+  // por terminado, `idleProbe` le pregunta al backend si el botón sigue pulsado
+  // (durante el arrastre nativo no llegan eventos de puntero): una PAUSA con el
+  // botón pulsado no es un fin de arrastre, y cerrar ahí colapsaba el widget "en
+  // la mano" del usuario a media maniobra.
   if (ui.moving) {
     clearTimeout(moveIdleTimer);
-    moveIdleTimer = setTimeout(endMove, 300);
+    moveIdleTimer = setTimeout(idleProbe, 300);
     return; // durante el arrastre, el guardado del ancla lo hace endMove (al soltar)
   }
   if (isSuppressed()) return;
   if (ui.peeking) return;
-  if (!prefs.rememberPosition) return;
   // Movimiento no iniciado por nosotros (p. ej. reacomodo del SO) estando en
-  // reposo: persistimos el ANCLA (esquina + coordenada), debounced para no leer
-  // tamaño/monitor en cada evento.
+  // reposo: actualizamos el ANCLA (esquina + coordenada), debounced para no leer
+  // tamaño/monitor en cada evento. SIEMPRE, aunque "recordar posición" esté
+  // apagado: el ancla es la fuente de verdad del cambio píldora↔completo; la
+  // preferencia solo decide si se RESTAURA al arrancar (restorePosition).
   clearTimeout(savePosTimer);
   savePosPending = true;
   savePosTimer = setTimeout(() => {
@@ -58,6 +61,26 @@ onFlushPrefs(() => {
 });
 
 const MOVE_THRESHOLD = 3; // px de holgura para distinguir click de arrastre
+
+// Sonda del respaldo: tras 300 ms sin `onMoved`, decide si el arrastre terminó de
+// verdad (botón suelto → endMove) o si es solo una pausa (botón pulsado → vuelve
+// a esperar). Si el backend no puede saberlo (otras plataformas), termina como
+// antes: mejor un fin temprano que un arrastre que nunca cierra.
+async function idleProbe() {
+  if (!ui.moving) return;
+  let pressed = false;
+  try {
+    pressed = await invoke("primary_button_down");
+  } catch (e) {
+    /* sin soporte: cae al comportamiento clásico */
+  }
+  if (pressed) {
+    clearTimeout(moveIdleTimer);
+    moveIdleTimer = setTimeout(idleProbe, 300);
+    return;
+  }
+  endMove();
+}
 
 // Termina el gesto: quita los listeners y cierra el movimiento (o dispara el click
 // si no llegó a arrastrarse). Compartido por ambos modos.
@@ -152,9 +175,13 @@ async function endMove() {
   if (!ui.moving) return;
   clearTimeout(moveIdleTimer);
   ui.moving = false;
-  // Captura el ancla en el punto donde se soltó ANTES de avisar del fin: así el
+  // Snap documentado: si quedó cerca de un borde (o medio fuera), se pega a él.
+  await snapToEdges();
+  // Captura el ancla en el punto donde quedó ANTES de avisar del fin: así el
   // colapso a píldora (que reposiciona desde el ancla) usa ya la posición nueva y
   // no la previa al arrastre (si no, el widget "volvería" a su sitio anterior).
-  if (prefs.rememberPosition) await captureAnchor();
+  // SIEMPRE, aunque "recordar posición" esté apagado: el ancla es la fuente de
+  // verdad del cambio de modo; la preferencia solo gobierna el arranque.
+  await captureAnchor();
   window.dispatchEvent(new Event("widget:move-end"));
 }

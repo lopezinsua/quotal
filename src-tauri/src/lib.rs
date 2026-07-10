@@ -135,6 +135,7 @@ pub fn run() {
             commands::hide_to_tray,
             commands::set_bounds,
             commands::animate_bounds,
+            commands::primary_button_down,
             commands::get_config,
             commands::update_check,
             commands::update_install,
