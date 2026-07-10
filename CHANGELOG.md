@@ -5,6 +5,29 @@ All notable changes to Quotal are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] — 2026-07-10
+
+### Fixed
+- **Window position now behaves as documented.**
+  - **Edge snapping is real**: releasing a drag near a screen edge — or with the
+    window partly off-screen — aligns it to that edge with the standard margin,
+    respecting the monitor's work area (it won't slide under the taskbar).
+  - **Multi-monitor restore**: the remembered position is restored on *its own*
+    monitor (per-monitor DPI aware), instead of being clamped onto whichever
+    monitor the window spawns on at startup.
+  - The corner anchor now **always tracks the window** after a move or resize,
+    even with "Remember position" off, so collapsing/expanding no longer jumps
+    back to a stale corner. The preference only governs restore-on-launch.
+  - Pausing mid-drag no longer collapses the widget "in your hand": the drag-end
+    fallback now asks the OS whether the primary mouse button is still down
+    (swapped-buttons aware) before ending the gesture.
+- **"Close with Claude Code" with several sessions open**: the `SessionEnd` hook
+  now closes the widget only when the ending session was the **last** live
+  Claude Code session. Previously, any session ending — a stray `claude -p`, one
+  of several terminals, or an IDE session — took the widget down while others
+  (e.g. your editor's integrated terminal) were still running, which made
+  auto-open appear broken in IDEs.
+
 ## [0.3.3] — 2026-07-01
 
 ### Added
@@ -113,6 +136,7 @@ Initial release.
 - Remembers position and size, snaps to screen edges, resizes proportionally.
 - Cross-platform installers (Windows, macOS, Linux) built automatically on tag.
 
+[0.3.4]: https://github.com/lopezinsua/quotal/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/lopezinsua/quotal/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/lopezinsua/quotal/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lopezinsua/quotal/compare/v0.3.0...v0.3.1
