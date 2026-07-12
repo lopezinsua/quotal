@@ -16,6 +16,6 @@
     "eslint": "^10",
     "globals": "^17",
     "jsdom": "^29",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
