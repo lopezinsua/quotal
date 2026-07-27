@@ -3,7 +3,7 @@
 
 use crate::poller;
 use crate::state::{MetricsPayload, SharedHandle, UsageMetrics};
-use crate::{claude_code_bridge, paths, usage_api};
+use crate::{claude_code_bridge, kimi_bridge, kimi_usage, paths, usage_api};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -26,6 +26,7 @@ pub fn get_metrics(state: State<'_, SharedHandle>) -> MetricsPayload {
     state.lock().map(|s| s.payload()).unwrap_or_else(|_| MetricsPayload {
         active: UsageMetrics::none(),
         plan: usage_api::PlanInfo::default(),
+        kimi: kimi_usage::KimiPlanInfo::default(),
         schema_warning: None,
         claude_code_version: None,
     })
@@ -56,6 +57,14 @@ pub fn detect_local_sources() -> LocalSources {
 pub async fn refresh_plan(app: AppHandle, state: State<'_, SharedHandle>) -> Result<(), String> {
     let info = usage_api::fetch().await;
     poller::apply_plan(&app, state.inner(), info);
+    Ok(())
+}
+
+/// Fuerza un refresco inmediato de los límites de Kimi (botón de la UI).
+#[tauri::command]
+pub async fn refresh_kimi(app: AppHandle, state: State<'_, SharedHandle>) -> Result<(), String> {
+    let info = kimi_usage::fetch().await;
+    poller::apply_kimi(&app, state.inner(), info);
     Ok(())
 }
 
@@ -109,6 +118,51 @@ pub fn uninstall_shutdown() -> Result<(), String> {
 #[tauri::command]
 pub fn shutdown_status() -> bool {
     claude_code_bridge::is_shutdown_installed()
+}
+
+// ---------------------------------------------------------------------------
+// Hooks de Kimi Code CLI (`~/.kimi-code/config.toml`): espejo de los de
+// Claude, con la misma guarda de solo-lectura en las instalaciones.
+// ---------------------------------------------------------------------------
+
+/// Instala el auto-arranque: hook `SessionStart` que abre el widget al iniciar
+/// Kimi Code en la terminal.
+#[tauri::command]
+pub fn install_kimi_autostart() -> Result<(), String> {
+    read_only_guard()?;
+    kimi_bridge::install_kimi_autostart_hook()
+}
+
+/// Quita el auto-arranque con Kimi Code.
+#[tauri::command]
+pub fn uninstall_kimi_autostart() -> Result<(), String> {
+    kimi_bridge::uninstall_kimi_autostart_hook()
+}
+
+/// ¿Está activo el auto-arranque con Kimi Code?
+#[tauri::command]
+pub fn kimi_autostart_status() -> bool {
+    kimi_bridge::is_kimi_autostart_installed()
+}
+
+/// Instala el auto-cierre: hook `SessionEnd` que cierra el widget cuando
+/// termina la ÚLTIMA sesión de Kimi Code viva.
+#[tauri::command]
+pub fn install_kimi_shutdown() -> Result<(), String> {
+    read_only_guard()?;
+    kimi_bridge::install_kimi_shutdown_hook()
+}
+
+/// Quita el auto-cierre con Kimi Code.
+#[tauri::command]
+pub fn uninstall_kimi_shutdown() -> Result<(), String> {
+    kimi_bridge::uninstall_kimi_shutdown_hook()
+}
+
+/// ¿Está activo el auto-cierre con Kimi Code?
+#[tauri::command]
+pub fn kimi_shutdown_status() -> bool {
+    kimi_bridge::is_kimi_shutdown_installed()
 }
 
 /// Está activo el puente statusLine (captura del contexto oficial)?

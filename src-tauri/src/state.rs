@@ -4,7 +4,7 @@
 // límites REALES del plan. Se reexporta desde `lib.rs` (`pub use state::*`), de
 // modo que el resto del crate lo usa como `crate::UsageMetrics`, `crate::SRC_*`, etc.
 
-use crate::usage_api;
+use crate::{kimi_usage, usage_api};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 
@@ -82,6 +82,8 @@ pub struct SharedState {
     pub(crate) sync: Option<UsageMetrics>,
     /// Datos REALES de límites del plan (vía endpoint `/usage`).
     pub(crate) plan: usage_api::PlanInfo,
+    /// Datos REALES de límites de Kimi (vía endpoint `/coding/v1/usages`).
+    pub(crate) kimi: kimi_usage::KimiPlanInfo,
 }
 
 /// Payload unificado emitido al frontend: límites reales del plan + contexto
@@ -90,6 +92,8 @@ pub struct SharedState {
 pub struct MetricsPayload {
     pub active: UsageMetrics,
     pub plan: usage_api::PlanInfo,
+    /// Límites de uso de Kimi (Kimi Code CLI). `configured=false` si no hay login.
+    pub kimi: kimi_usage::KimiPlanInfo,
     /// Fuentes cuyo formato parece haber cambiado (deriva de esquema de Claude
     /// Code). `None` si todo parsea bien. La UI lo usa para avisar al usuario.
     pub schema_warning: Option<Vec<String>>,
@@ -103,6 +107,7 @@ impl SharedState {
         MetricsPayload {
             active: self.active(),
             plan: self.plan.clone(),
+            kimi: self.kimi.clone(),
             schema_warning: crate::schema_watch::warning(),
             claude_code_version: crate::schema_watch::claude_version(),
         }

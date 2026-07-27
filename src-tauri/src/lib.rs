@@ -19,6 +19,8 @@ mod app_config;
 mod claude_code_bridge;
 mod claude_log_parser;
 mod commands;
+mod kimi_bridge;
+mod kimi_usage;
 mod local_file_watcher;
 pub mod paths;
 mod poller;
@@ -106,8 +108,11 @@ pub fn run() {
             // si la app se movió/renombró/actualizó desde que se instalaron (si no,
             // apuntarían a una ruta vieja y dejarían de funcionar en silencio).
             claude_code_bridge::resync_installed_hooks();
+            // Lo mismo para los hooks de Kimi Code CLI (config.toml + VBS).
+            kimi_bridge::resync_kimi_hooks();
             poller::spawn_watchers(app.handle().clone(), shared.clone());
             poller::spawn_plan_poller(app.handle().clone(), shared.clone());
+            poller::spawn_kimi_poller(app.handle().clone(), shared.clone());
             // Auto-actualización: comprobación silenciosa en segundo plano. Si hay
             // una versión nueva NO la instala; emite `update://available` y es la
             // UI quien decide mostrar el aviso (con botón de instalar). Los errores
@@ -119,6 +124,7 @@ pub fn run() {
             commands::get_active_mode,
             commands::get_metrics,
             commands::refresh_plan,
+            commands::refresh_kimi,
             commands::detect_local_sources,
             commands::install_autostart,
             commands::uninstall_autostart,
@@ -126,6 +132,12 @@ pub fn run() {
             commands::install_shutdown,
             commands::uninstall_shutdown,
             commands::shutdown_status,
+            commands::install_kimi_autostart,
+            commands::uninstall_kimi_autostart,
+            commands::kimi_autostart_status,
+            commands::install_kimi_shutdown,
+            commands::uninstall_kimi_shutdown,
+            commands::kimi_shutdown_status,
             commands::statusline_status,
             commands::install_statusline_bridge,
             commands::uninstall_statusline_bridge,

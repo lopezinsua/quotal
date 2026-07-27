@@ -36,6 +36,9 @@ export const prefs = Object.assign(
     onTop: true,
     collapsed: false,
     showContext: true,
+    // Vista de proveedor en la tarjeta: "both" (default, Claude + Kimi) |
+    // "claude" (solo Claude) | "kimi" (solo Kimi; píldora y frescura de Kimi).
+    providerView: "both",
     // Estilo de la píldora colapsada: "bar" | "ring" | "minimal".
     pillStyle: DEFAULT_PILL_STYLE,
     // Tema del widget: "dark" (default) | "light".

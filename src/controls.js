@@ -66,12 +66,14 @@ function applyBorderGlow() {
 // ---- Preferencias visuales (aplica al DOM + sincroniza checkboxes) ----
 export async function applyVisualPrefs() {
   el.card.classList.toggle("translucent", prefs.translucent);
-  el.contextLine.classList.toggle("hidden", !prefs.showContext);
+  // La línea de contexto cede tanto con su toggle como en la vista "Solo Kimi".
+  el.contextLine.classList.toggle("hidden", !prefs.showContext || prefs.providerView === "kimi");
   el.optTranslucent.checked = prefs.translucent;
   el.optOnTop.checked = prefs.onTop;
   el.optCollapsed.checked = prefs.collapsed;
   el.optShowContext.checked = prefs.showContext;
   el.optRememberPos.checked = prefs.rememberPosition;
+  if (el.optProviderView) el.optProviderView.value = prefs.providerView || "both";
   applyPillStyle();
   applyTheme(el.card, prefs.theme);
   applyAccent(el.card, prefs.accent);
@@ -98,6 +100,16 @@ export async function applyVisualPrefs() {
       el.optClose.checked = !!on;
     })
     .catch((e) => console.error("shutdown_status:", e));
+  invoke("kimi_autostart_status")
+    .then((on) => {
+      el.optKimiAutostart.checked = !!on;
+    })
+    .catch((e) => console.error("kimi_autostart_status:", e));
+  invoke("kimi_shutdown_status")
+    .then((on) => {
+      el.optKimiClose.checked = !!on;
+    })
+    .catch((e) => console.error("kimi_shutdown_status:", e));
   invoke("statusline_status")
     .then((on) => {
       el.optStatusline.checked = !!on;
@@ -200,9 +212,21 @@ el.optCollapsed.addEventListener("change", () => {
 });
 el.optShowContext.addEventListener("change", () => {
   prefs.showContext = el.optShowContext.checked;
-  el.contextLine.classList.toggle("hidden", !prefs.showContext);
+  // Respeta también la vista de proveedor: en "Solo Kimi" la línea queda oculta.
+  el.contextLine.classList.toggle("hidden", !prefs.showContext || prefs.providerView === "kimi");
   savePrefs();
 });
+
+// Vista de proveedor (Claude / Kimi / ambos): guarda la preferencia y repinta
+// con el último dato. Sin relayout: el tamaño de ventana no cambia, igual que
+// el toggle de contexto.
+if (el.optProviderView) {
+  el.optProviderView.addEventListener("change", () => {
+    prefs.providerView = el.optProviderView.value;
+    savePrefs();
+    if (ui.lastPayload) render(ui.lastPayload);
+  });
+}
 
 // Iluminar borde con el uso: on/off del anillo de aviso/crítico del marco.
 el.optBorderGlow.addEventListener("change", () => {
@@ -365,13 +389,24 @@ bindClaudeToggle(el.optAutostart, "install_autostart", "uninstall_autostart");
 // Cerrar con Claude Code: instala/quita el hook SessionEnd que cierra el widget
 // al salir de la terminal. Quitarlo restaura settings.json a como estaba antes.
 bindClaudeToggle(el.optClose, "install_shutdown", "uninstall_shutdown");
+// Abrir con Kimi Code: instala/quita el hook SessionStart en config.toml.
+bindClaudeToggle(el.optKimiAutostart, "install_kimi_autostart", "uninstall_kimi_autostart");
+// Cerrar con Kimi Code: instala/quita el hook SessionEnd que cierra el widget
+// cuando ya no queda ninguna sesión viva de kimi.exe.
+bindClaudeToggle(el.optKimiClose, "install_kimi_shutdown", "uninstall_kimi_shutdown");
 // Contexto oficial: instala/quita el puente statusLine (envuelve tu statusline).
 bindClaudeToggle(el.optStatusline, "install_statusline_bridge", "uninstall_statusline_bridge");
 
 // En modo solo-lectura, los toggles que ESCRIBEN en settings.json (los hooks) se
 // deshabilitan: instalarlos fallaría en el backend por diseño.
 function setHookTogglesDisabled(disabled) {
-  for (const c of [el.optAutostart, el.optClose, el.optStatusline]) {
+  for (const c of [
+    el.optAutostart,
+    el.optClose,
+    el.optKimiAutostart,
+    el.optKimiClose,
+    el.optStatusline,
+  ]) {
     if (c) c.disabled = disabled;
   }
 }
@@ -505,9 +540,11 @@ el.refreshBtn.addEventListener("click", async () => {
   if (refreshing) return;
   refreshing = true;
   try {
-    await fluidSpin(() => invoke("refresh_plan"));
+    // Refresca en paralelo el plan de Claude y el uso de Kimi (si el backend lo
+    // tiene cableado); ambos terminan antes de frenar el giro del icono.
+    await fluidSpin(() => Promise.all([invoke("refresh_plan"), invoke("refresh_kimi")]));
   } catch (e) {
-    console.error("refresh_plan:", e);
+    console.error("refresh:", e);
   } finally {
     refreshing = false;
   }
