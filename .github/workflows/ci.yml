@@ -39,6 +39,12 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
+      # Las 5 declaraciones de versión deben coincidir siempre (y el CHANGELOG
+      # tener su sección): así un cambio de versión a medias se ve en el PR, no al
+      # publicar. Ver scripts/bump-version.mjs.
+      - name: Versiones coherentes
+        run: node scripts/check-release.mjs "v$(node -p "require('./package.json').version")"
+
       # Auditoría de dependencias JS. Quotal no envía NINGUNA dependencia npm al
       # usuario (el frontend es JS vanilla servido como estáticos), así que esto
       # solo protege la cadena de herramientas de build. Falla en severidad alta+.
