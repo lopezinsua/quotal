@@ -982,6 +982,105 @@ body {
   font-weight: 600;
 }
 .notice-btn.primary:hover { filter: brightness(1.08); }
+/* Aviso COMPACTO (actualizaciones): una sola fila que, mientras está visible,
+   ocupa el sitio de la cabecera del plan (ver `.card.has-notice`). La tarjeta
+   tiene alto fijo: un aviso de varias filas dejaba fuera la semana y el contexto. */
+.notice-compact {
+  position: relative;
+  flex-shrink: 0; /* la tarjeta es flex de alto fijo: no debe aplastarlo */
+  margin-top: 4px;
+  padding: 3px 3px 3px 9px;
+  gap: 5px;
+  overflow: hidden;
+}
+.notice-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+}
+.notice-row .notice-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Un error necesita leerse entero: en ese estado el texto sí puede partirse. */
+.notice-compact.error .notice-row .notice-text {
+  white-space: normal;
+  color: var(--state-crit);
+}
+.notice-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.notice-icon:hover { background: var(--surface-hover); color: var(--fg); }
+.notice-icon svg { transition: transform 0.18s ease; }
+.notice-icon[aria-expanded="true"] svg { transform: rotate(180deg); }
+.notice-more {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 0 5px 3px 0;
+}
+.notice-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 9.5px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.notice-link:hover { color: var(--fg); }
+/* Mientras hay un aviso compacto, la cabecera del plan le cede su sitio. */
+.card.has-notice #plan-head { display: none; }
+
+/* Progreso de la descarga: una línea en el borde inferior del aviso (no ocupa
+   alto, así el aviso sigue siendo de una fila). */
+.upd-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--track);
+}
+.upd-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--indigo);
+  transition: width 0.2s linear;
+}
+/* Novedades de la versión: texto plano en lista, con tope de alto (la tarjeta es
+   pequeña) y scroll si hay más. */
+.notice-notes {
+  max-height: 96px;
+  overflow-y: auto;
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--body);
+  font-size: 9.5px;
+  line-height: 1.35;
+  user-select: text;
+}
+.notice-notes li::marker { color: var(--muted); }
+
 .notice-detail {
   display: flex;
   flex-direction: column;

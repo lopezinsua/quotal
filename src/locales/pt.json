@@ -118,5 +118,16 @@
   "eta_h": "Limite ~{h}h{m}",
   "eta_m": "Limite ~{m}min",
   "eta_hint": "No ritmo recente você atinge o limite antes de ele reiniciar",
+  "upd_whats_new": "Novidades",
+  "upd_downloading": "Baixando… {pct}%",
+  "upd_downloading_mb": "Baixando… {mb} MB",
+  "upd_err_net": "Não foi possível conectar ao GitHub. Verifique sua conexão e tente de novo.",
+  "upd_err_sig": "A assinatura da atualização não é válida; ela não foi instalada.",
+  "upd_auto": "Procurar atualizações automaticamente",
+  "upd_last": "Última verificação: {fresh}",
+  "upd_done": "Atualizado para v{v}",
+  "upd_more": "…e mais {n} mudanças",
+  "upd_short": "v{v} disponível",
+  "upd_options": "Mais opções",
   "_auto": "Automático"
 }

@@ -28,6 +28,7 @@ mod providers;
 mod schema_watch;
 mod state;
 mod tray;
+mod updates;
 mod usage_api;
 
 // Reexporta los tipos/constantes del estado al raíz del crate, para que el resto
@@ -113,11 +114,10 @@ pub fn run() {
             poller::spawn_watchers(app.handle().clone(), shared.clone());
             poller::spawn_plan_poller(app.handle().clone(), shared.clone());
             poller::spawn_kimi_poller(app.handle().clone(), shared.clone());
-            // Auto-actualización: comprobación silenciosa en segundo plano. Si hay
-            // una versión nueva NO la instala; emite `update://available` y es la
-            // UI quien decide mostrar el aviso (con botón de instalar). Los errores
-            // (sin red, sin update, en `tauri dev`…) solo se registran.
-            tauri::async_runtime::spawn(announce_update(app.handle().clone()));
+            // Actualizaciones: comprobación en segundo plano (al arrancar y cada
+            // pocas horas, si está activada). Nunca instala sola: emite
+            // `update://available` y la UI ofrece el botón.
+            updates::spawn_background_checks(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -150,28 +150,12 @@ pub fn run() {
             commands::animate_bounds,
             commands::primary_button_down,
             commands::get_config,
-            commands::update_check,
-            commands::update_install,
+            updates::update_check,
+            updates::update_install,
+            updates::update_prefs,
+            updates::set_auto_update_check,
             commands::check_system_deps,
         ])
         .run(tauri::generate_context!())
         .expect("error al arrancar la aplicación Tauri");
-}
-
-/// Comprueba al arranque si hay una versión más reciente y, si la hay, EMITE
-/// `update://available` con el estado para que la UI muestre el aviso (con botón
-/// de instalar). No instala nada por su cuenta: lo decide el usuario. Cualquier
-/// fallo (sin red, endpoint inaccesible, ejecución sin empaquetar en `tauri dev`…)
-/// solo se registra, sin afectar al funcionamiento normal.
-async fn announce_update(app: tauri::AppHandle) {
-    use tauri::Emitter;
-    let status = commands::fetch_update_status(&app).await;
-    if status.available {
-        log::info!("Actualización disponible: v{}", status.version.as_deref().unwrap_or("?"));
-        let _ = app.emit("update://available", status);
-    } else if let Some(e) = &status.error {
-        log::info!("Comprobación de actualización fallida (se ignora): {e}");
-    } else {
-        log::info!("La app está al día (sin actualizaciones).");
-    }
 }

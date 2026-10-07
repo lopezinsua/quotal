@@ -84,7 +84,7 @@ turns that same data into something **ambient**.
 | Tray icon, color by severity (normal / warning / critical) | ✅ |
 | Desktop notifications when usage nears your limit (opt-in, configurable) | ✅ |
 | Open / Close with Claude Code (optional, reversible hooks) | ✅ |
-| In-app update notifications | ✅ |
+| In-app updates: checks every few hours, "What's new", download progress (signed, opt-out) | ✅ |
 | Remembers position & size, snaps to edges | ✅ |
 | Offline fallback (`statusLine` data + last good value) | ✅ |
 | 11 languages, auto-detected from your OS | ✅ |
@@ -199,9 +199,11 @@ nothing in Claude Code.
 > [!IMPORTANT]
 > 🔒 **Your data never leaves your machine.**
 >
-> - **No telemetry. No analytics. No accounts. No cloud.** Quotal makes exactly one kind
->   of network call: to Anthropic's own `/usage` endpoint — the *same* request the Claude
->   Code CLI already makes. Nothing is ever sent anywhere else.
+> - **No telemetry. No analytics. No accounts. No cloud.** Quotal only talks to:
+>   Anthropic's own `/usage` endpoint (the *same* request the Claude Code CLI already
+>   makes), Kimi's usage endpoint if you use Kimi Code, and GitHub Releases to check for
+>   updates — which you can turn off in Settings. Nothing about you or your usage is
+>   ever sent anywhere.
 > - Quotal **never creates or stores credentials of its own** — it reuses the OAuth token
 >   Claude Code already keeps locally, and never copies it elsewhere.
 > - **Signed auto-updates.** In-app updates are verified end-to-end with a
@@ -266,13 +268,22 @@ how to extend Quotal, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the i
 
 ## Release
 
-Pushing a `vX.Y.Z` tag triggers the GitHub Actions workflow, which builds native
-installers on Windows, macOS and Linux runners and attaches them to a draft release.
+One command prepares a release: it bumps the version in the five files that
+declare it and turns the `[Unreleased]` section of the changelog into the new
+version.
 
 ```bash
-git tag v0.3.2
-git push origin v0.3.2
+node scripts/bump-version.mjs 0.4.0   # review the diff, then commit
+git tag v0.4.0
+git push origin main v0.4.0
 ```
+
+The tag triggers the GitHub Actions workflow. It first checks that the tag matches
+every version file (otherwise it stops: the update feed would announce the old
+version and no installed app would update), then builds native installers on
+Windows, macOS and Linux and attaches them to a **draft** release. That version's
+changelog section becomes the release notes and the "What's new" shown in the
+app's update notice. Publishing the draft makes it available to everyone.
 
 ## Roadmap
 

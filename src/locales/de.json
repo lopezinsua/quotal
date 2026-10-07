@@ -118,5 +118,16 @@
   "eta_h": "Limit ~{h}h {m}min",
   "eta_m": "Limit ~{m} Min.",
   "eta_hint": "Beim aktuellen Tempo erreichst du das Limit vor dem Reset",
+  "upd_whats_new": "Neuerungen",
+  "upd_downloading": "Wird geladen… {pct} %",
+  "upd_downloading_mb": "Wird geladen… {mb} MB",
+  "upd_err_net": "GitHub ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+  "upd_err_sig": "Die Signatur des Updates ist ungültig; es wurde nicht installiert.",
+  "upd_auto": "Automatisch nach Updates suchen",
+  "upd_last": "Zuletzt geprüft: {fresh}",
+  "upd_done": "Auf v{v} aktualisiert",
+  "upd_more": "…und {n} weitere Änderungen",
+  "upd_short": "v{v} verfügbar",
+  "upd_options": "Weitere Optionen",
   "_auto": "Automatisch"
 }

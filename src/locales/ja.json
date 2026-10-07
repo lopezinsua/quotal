@@ -118,5 +118,16 @@
   "eta_h": "約{h}時間{m}分で上限",
   "eta_m": "約{m}分で上限",
   "eta_hint": "最近のペースだと、リセット前に上限に達します",
+  "upd_whats_new": "新機能",
+  "upd_downloading": "ダウンロード中… {pct}%",
+  "upd_downloading_mb": "ダウンロード中… {mb} MB",
+  "upd_err_net": "GitHub に接続できません。接続を確認して再試行してください。",
+  "upd_err_sig": "アップデートの署名が無効なため、インストールしませんでした。",
+  "upd_auto": "アップデートを自動で確認",
+  "upd_last": "最終確認：{fresh}",
+  "upd_done": "v{v} に更新しました",
+  "upd_more": "…ほか {n} 件の変更",
+  "upd_short": "v{v} が利用可能",
+  "upd_options": "その他",
   "_auto": "自動"
 }

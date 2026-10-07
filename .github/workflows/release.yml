@@ -45,7 +45,36 @@ on:
       - "v*"
 
 jobs:
+  # Guardia previa: la etiqueta debe coincidir con la versión de los 5 ficheros que
+  # la declaran. Si no, la release anunciaría la versión VIEJA en latest.json y
+  # ninguna app instalada se actualizaría. También extrae del CHANGELOG las notas
+  # de esa versión: van al cuerpo de la release y a latest.json, y la app las
+  # muestra como "Novedades". (Prepara todo con scripts/bump-version.mjs.)
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configurar Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Comprobar versión y extraer notas del CHANGELOG
+        id: notes
+        if: github.ref_type == 'tag'
+        run: |
+          node scripts/check-release.mjs "${{ github.ref_name }}" notes.md
+          {
+            echo "notes<<QUOTAL_NOTES_EOF"
+            cat notes.md
+            echo "QUOTAL_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: verify
     permissions:
       contents: write
     strategy:
@@ -141,6 +170,9 @@ jobs:
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v0.0.0-{0}', github.run_number) }}
           releaseName: "Quotal ${{ github.ref_name }}"
+          # Notas de la versión (del CHANGELOG): cuerpo de la release y "notes" de
+          # latest.json, que la app enseña en el aviso de actualización.
+          releaseBody: ${{ needs.verify.outputs.notes }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

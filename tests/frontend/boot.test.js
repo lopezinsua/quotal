@@ -120,6 +120,12 @@ beforeAll(async () => {
     v: 6 + i,
   }));
   localStorage.setItem("widget-usage-history", JSON.stringify(hist));
+  // Simula el arranque justo DESPUÉS de actualizar desde la 0.0.1 a la 9.9.9 (la
+  // versión que devuelve get_config), con las novedades guardadas antes de instalar.
+  localStorage.setItem(
+    "widget-prefs",
+    JSON.stringify({ lastVersion: "0.0.1", pendingUpdate: { version: "9.9.9", notes: "- Nuevo X" } }),
+  );
   await import("../../src/main.js");
   // El arranque es una cadena de promesas (prefs → layout → posición → show):
   // esperamos a su ÚLTIMO paso en vez de contar ticks, que varía entre versiones.
@@ -182,6 +188,53 @@ describe("arranque completo del frontend", () => {
     await flush();
     expect(auto.checked).toBe(false);
     expect(err.textContent).toMatch(/syntax error/);
+  });
+
+  it("tras actualizar avisa una vez con las novedades guardadas", () => {
+    const banner = document.getElementById("updated-banner");
+    expect(banner.classList.contains("hidden")).toBe(false);
+    expect(document.getElementById("updated-text").textContent).toBe("Updated to v9.9.9");
+    expect(document.getElementById("updated-notes").textContent).toBe("Nuevo X");
+    const saved = JSON.parse(localStorage.getItem("widget-prefs"));
+    expect(saved.lastVersion).toBe("9.9.9");
+    expect(saved.pendingUpdate).toBeNull();
+    // El aviso ocupa el sitio de la cabecera del plan (alto fijo de la tarjeta).
+    expect(document.getElementById("card").classList.contains("has-notice")).toBe(true);
+    document.getElementById("updated-dismiss").click();
+    expect(banner.classList.contains("hidden")).toBe(true);
+    expect(document.getElementById("card").classList.contains("has-notice")).toBe(false);
+  });
+
+  it("avisa de una versión nueva con novedades y muestra el progreso", async () => {
+    listeners["update://available"]({
+      payload: { available: true, version: "10.0.0", notes: "### Added\n- Cosa A\n- Cosa B" },
+    });
+    await flush();
+    expect(document.getElementById("update-banner").classList.contains("hidden")).toBe(false);
+    expect(document.getElementById("card").classList.contains("has-notice")).toBe(true);
+    const text = document.getElementById("update-text");
+    expect(text.textContent).toBe("v10.0.0 available");
+    expect(text.title).toBe("Update available: v10.0.0");
+    // El ⌄ despliega las novedades y "No mostrar más".
+    const toggle = document.getElementById("update-notes-toggle");
+    const more = document.getElementById("update-more");
+    expect(more.classList.contains("hidden")).toBe(true);
+    toggle.click();
+    expect(more.classList.contains("hidden")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById("update-notes").children).toHaveLength(2);
+
+    listeners["update://progress"]({ payload: { phase: "download", downloaded: 512, total: 2048 } });
+    expect(text.textContent).toBe("Downloading… 25%");
+    expect(document.getElementById("update-progress-fill").style.width).toBe("25%");
+  });
+
+  it("Descartar no vuelve a sacar la misma versión en la sesión", async () => {
+    document.getElementById("update-dismiss").click();
+    expect(document.getElementById("card").classList.contains("has-notice")).toBe(false);
+    listeners["update://available"]({ payload: { available: true, version: "10.0.0" } });
+    await flush();
+    expect(document.getElementById("update-banner").classList.contains("hidden")).toBe(true);
   });
 
   it("muestra la versión instalada en ajustes", () => {

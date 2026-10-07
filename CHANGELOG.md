@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   percentage, e.g. "Limit ~28m". It stays out of the way otherwise; in languages
   where it doesn't fit next to the number it takes the reset slot, and the
   reset time moves to the tooltip.
+- **Better updates.**
+  - Quotal now checks for updates every few hours while it's open, not only at
+    launch (a widget often stays open for days). A new setting turns automatic
+    checks off; "Check for updates" always works.
+  - The update notice shows **what's new** in that version, and installing shows
+    real **download progress** instead of a bare "Updating…".
+  - After an update, a one-time notice confirms the new version and its changes.
+  - Clear messages when something fails ("Couldn't reach GitHub…", invalid
+    signature) instead of raw technical errors. "Dismiss" now holds for the whole
+    session instead of coming back with the next check.
 
 ### Fixed
 - With a non-English language, the first numbers ("72% used", "Resets in…")

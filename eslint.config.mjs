@@ -23,4 +23,17 @@ export default [
       "no-unused-vars": ["error", { caughtErrors: "none" }],
     },
   },
+  {
+    // Scripts del proceso de release (Node): mismas reglas, entorno Node.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.node },
+    },
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": ["error", { caughtErrors: "none" }],
+    },
+  },
 ];
