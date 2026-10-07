@@ -39,7 +39,8 @@ export function fmtResetIn(iso) {
   if (isNaN(ms) || ms <= 0) return t("reset_now");
   const h = Math.floor(ms / 3.6e6);
   const m = Math.floor((ms % 3.6e6) / 6e4);
-  return h >= 1 ? t("reset_in_h", { h, m }) : t("reset_in_m", { m });
+  // En el último minuto, "1m" en vez de un engañoso "0m".
+  return h >= 1 ? t("reset_in_h", { h, m }) : t("reset_in_m", { m: Math.max(1, m) });
 }
 
 // Fecha absoluta corta, con día/hora formateados según el idioma (Intl).
@@ -58,6 +59,20 @@ export function fmtFreshness(secs) {
   if (secs < 60) return t("fresh_now");
   if (secs < 3600) return t("fresh_min", { n: Math.floor(secs / 60) });
   return t("fresh_hour", { n: Math.floor(secs / 3600) });
+}
+
+// Texto para un toggle de Claude Code que no se pudo aplicar. El backend antepone
+// un CÓDIGO estable al detalle (`node_missing: …`); los conocidos se traducen y el
+// resto se muestra tal cual dentro de un mensaje genérico.
+const HOOK_ERRORS = {
+  read_only: "hook_err_read_only",
+  node_missing: "hook_err_node",
+  settings_invalid: "hook_err_settings",
+};
+export function hookErrorText(err) {
+  const raw = String(err ?? "");
+  const code = raw.split(":")[0].trim();
+  return HOOK_ERRORS[code] ? t(HOOK_ERRORS[code]) : t("hook_failed", { err: raw });
 }
 
 export function secsSince(iso) {

@@ -9,6 +9,7 @@ import {
   fmtResetAt,
   fmtFreshness,
   secsSince,
+  hookErrorText,
 } from "../../src/format.js";
 
 describe("worstSeverity", () => {
@@ -62,6 +63,24 @@ describe("fmtResetIn", () => {
     expect(fmtResetIn(inMin)).toBe("Resets in 5m");
     const inHrs = new Date(Date.now() + 3 * 3.6e6 + 55 * 60_000 + 30_000).toISOString();
     expect(fmtResetIn(inHrs)).toBe("Resets in 3h 55m");
+  });
+  it("en el último minuto no muestra '0m'", () => {
+    const inSecs = new Date(Date.now() + 20_000).toISOString();
+    expect(fmtResetIn(inSecs)).toBe("Resets in 1m");
+  });
+});
+
+describe("hookErrorText", () => {
+  it("traduce los códigos conocidos del backend", () => {
+    expect(hookErrorText("node_missing: Node.js no está en el PATH")).toMatch(/Node\.js/);
+    expect(hookErrorText("settings_invalid: C:\\x\\settings.json no es JSON válido")).toMatch(
+      /settings\.json/,
+    );
+    expect(hookErrorText("read_only: activo")).toMatch(/[Rr]ead-only/);
+  });
+  it("un error desconocido se muestra dentro del mensaje genérico", () => {
+    expect(hookErrorText("disco lleno")).toContain("disco lleno");
+    expect(hookErrorText(undefined)).toBeTypeOf("string");
   });
 });
 

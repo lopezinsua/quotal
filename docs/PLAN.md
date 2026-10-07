@@ -1,6 +1,8 @@
 # Plan de mejora de Quotal
 
-> Estado: propuesta · Fecha: 2026-07-01 · Versión base: v0.3.2
+> Estado: **completado** (PR1–PR14 entregados en v0.3.3–v0.3.4; la firma de código
+> sigue a la espera del certificado, ver [SIGNING.md](SIGNING.md)) · Fecha: 2026-07-01 ·
+> Versión base: v0.3.2
 >
 > Documento de trabajo orientado a desarrolladores. El "Roadmap" del README es la
 > versión de cara al usuario (features visibles); **este** documento es el plan
@@ -105,5 +107,10 @@ Mucho de lo que parecería "deuda" ya está resuelto y bien resuelto. No tocar:
 
 ## Seguimiento
 
-Marcar cada PR al completarlo. Mantener este documento como fuente de verdad del plan
-técnico; el README solo refleja las features de cara al usuario cuando ya están hechas.
+Todos los PRs del roadmap están entregados (ver `CHANGELOG.md`). El punto débil 4 se
+cerró del todo en la auditoría posterior (#42): los transcripts de subagentes ya no se
+confunden con la sesión activa y el watcher no re-escanea `~/.claude/projects/` en cada
+escritura. Esa misma auditoría añadió el limitador de 429, la protección de un
+`settings.json` ilegible y el test de humo del arranque del frontend.
+
+Pendiente fuera de código: certificado de firma (Windows/macOS).

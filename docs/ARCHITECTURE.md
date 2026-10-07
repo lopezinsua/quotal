@@ -111,6 +111,18 @@ no romperse en silencio si Anthropic los cambia:
 Los detectores de deriva son funciones PURAS y testeadas (`*_drift`), para distinguir
 "cambió el formato" de "aún no hay dato" (sin login, sesión recién abierta).
 
+## Límites del endpoint `/usage` (429)
+
+`usage_api` mantiene un limitador: tras un 429 respeta `Retry-After` (acotado a
+1 s–1 h) o, si no viene, aplica backoff exponencial (120 s → 30 min). Mientras está
+activo, `fetch()` no toca la red —tampoco el refresco manual— y el poller duerme lo
+que indique `next_poll_delay`. Un fetch correcto lo resetea.
+
+Mientras no hay dato nuevo se conserva el último plan bueno (`poller::merge_plan`,
+función pura), salvo las ventanas cuyo `resets_at` ya pasó: se sustituyen por el
+statusLine si está vigente o se purgan (la UI muestra "—"). Lo mismo al cargar la
+caché del arranque.
+
 ## Seguridad y modo solo-lectura
 
 - El token OAuth se **reutiliza** del local de Claude Code; nunca se crea uno propio.
@@ -135,12 +147,19 @@ Registrados en `lib.rs`; implementados en `commands.rs`.
 | `install_shutdown` / `uninstall_shutdown` / `shutdown_status` | `Result<()>` / `bool` | Hook `SessionEnd`. |
 | `install_statusline_bridge` / `uninstall_statusline_bridge` / `statusline_status` | `Result<()>` / `bool` | Puente del statusLine. |
 | `set_read_only` / `read_only_status` | `()` / `bool` | Modo observador. |
-| `set_tray_static` / `hide_to_tray` | `()` | Bandeja. |
+| `set_tray_static` / `set_tray_labels` / `hide_to_tray` | `()` | Bandeja (color fijo, textos traducidos que envía el front, ocultar). |
+| `primary_button_down` | `bool` | ¿Botón primario pulsado? (fin de arrastre fiable, Windows). |
 | `set_bounds` / `animate_bounds` | `Result<()>` | Geometría de la ventana. |
 | `update_check` / `update_install` | `UpdateStatus` / `Result<()>` | Auto-actualización. |
 | `check_system_deps` | objeto | Libs nativas que faltan (Linux). |
 
 Los `install_*` rechazan en modo solo-lectura.
+
+Los errores de los toggles de Claude Code empiezan por un **código estable** que la UI
+traduce (`format.js::hookErrorText`): `read_only:`, `node_missing:` (el puente
+statusLine necesita Node.js en el PATH) y `settings_invalid:`. Este último protege
+`settings.json`: `claude_code_bridge::read_settings` distingue "no existe" (`{}`) de
+"ilegible" (`Err`) y **nunca** escribe sobre un fichero que no pudo parsear.
 
 ## Eventos emitidos por el backend
 
@@ -161,10 +180,10 @@ Los `install_*` rechazan en modo solo-lectura.
 | `poller.rs` | Watchers `notify` (con respaldo por sondeo) + sondeo del plan. |
 | `usage_api.rs` | `/usage`, refresco de token, write-back CAS. |
 | `claude_code_bridge.rs` | Puente statusLine + hooks (settings.json). |
-| `claude_log_parser.rs` | Parseo de transcripts `.jsonl`. |
+| `claude_log_parser.rs` | Parseo de transcripts `.jsonl` (ignora los de subagentes; usa la ruta del evento del watcher en vez de re-escanear). |
 | `local_file_watcher.rs` | Parseo de `sync.json`. |
 | `schema_watch.rs` | Telemetría de deriva + versión de Claude Code. |
 | `app_config.rs` | Config del backend (modo solo-lectura). |
 | `paths.rs` | Rutas (Claude Code + widget). |
-| `tray.rs` | Icono/menú de bandeja. |
+| `tray.rs` | Icono/menú de bandeja y su tooltip (textos traducidos). |
 | `commands.rs` | Comandos IPC. |

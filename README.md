@@ -247,7 +247,7 @@ flowchart TD
 
 ## Build from source
 
-Requires [Rust](https://rustup.rs) and [Node.js](https://nodejs.org) 20+.
+Requires [Rust](https://rustup.rs) and [Node.js](https://nodejs.org) 22.12+.
 
 ```bash
 npm install

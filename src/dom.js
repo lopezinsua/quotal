@@ -45,6 +45,7 @@ export const el = {
   optClose: document.getElementById("opt-close"),
   optStatusline: document.getElementById("opt-statusline"),
   optReadOnly: document.getElementById("opt-readonly"),
+  hooksError: document.getElementById("hooks-error"),
   optNotify: document.getElementById("opt-notify"),
   optNotifyThreshold: document.getElementById("opt-notify-threshold"),
   optBorderGlow: document.getElementById("opt-border-glow"),

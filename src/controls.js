@@ -21,6 +21,7 @@ import {
 import { i18nReady } from "./boot.js";
 import { ensureNotifyPermission, rearmNotifications } from "./notify.js";
 import { applyTheme, applyAccent, theme, accent } from "./theme.js";
+import { hookErrorText } from "./format.js";
 
 // Flags locales a la interacción.
 let settingsOpen = false;
@@ -333,39 +334,39 @@ posCells.forEach((cell) => {
   });
 });
 
-// Abrir con Claude Code: instala/quita el hook SessionStart en settings.json.
-el.optAutostart.addEventListener("change", async () => {
-  const on = el.optAutostart.checked;
-  try {
-    await invoke(on ? "install_autostart" : "uninstall_autostart");
-  } catch (e) {
-    console.error("autostart:", e);
-    el.optAutostart.checked = !on; // revertir si falló
-  }
-});
+// Los toggles que tocan la configuración de Claude Code pueden fallar por motivos
+// que el usuario debe CONOCER (settings.json con un error de sintaxis, Node.js
+// ausente, modo solo-lectura…): antes el checkbox solo "rebotaba" sin explicación.
+// El backend antepone un código estable al detalle (ver `hookErrorText`).
+function showHookError(err) {
+  if (!el.hooksError) return;
+  el.hooksError.textContent = err == null ? "" : hookErrorText(err);
+  el.hooksError.classList.toggle("hidden", err == null);
+}
 
+// Engancha un toggle que instala/quita algo en Claude Code: invoca el comando y,
+// si falla, revierte el checkbox y muestra el motivo.
+function bindClaudeToggle(input, installCmd, uninstallCmd) {
+  input.addEventListener("change", async () => {
+    const on = input.checked;
+    showHookError(null);
+    try {
+      await invoke(on ? installCmd : uninstallCmd);
+    } catch (e) {
+      console.error(`${on ? installCmd : uninstallCmd}:`, e);
+      input.checked = !on; // revertir si falló
+      showHookError(e);
+    }
+  });
+}
+
+// Abrir con Claude Code: instala/quita el hook SessionStart en settings.json.
+bindClaudeToggle(el.optAutostart, "install_autostart", "uninstall_autostart");
 // Cerrar con Claude Code: instala/quita el hook SessionEnd que cierra el widget
 // al salir de la terminal. Quitarlo restaura settings.json a como estaba antes.
-el.optClose.addEventListener("change", async () => {
-  const on = el.optClose.checked;
-  try {
-    await invoke(on ? "install_shutdown" : "uninstall_shutdown");
-  } catch (e) {
-    console.error("shutdown:", e);
-    el.optClose.checked = !on; // revertir si falló
-  }
-});
-
+bindClaudeToggle(el.optClose, "install_shutdown", "uninstall_shutdown");
 // Contexto oficial: instala/quita el puente statusLine (envuelve tu statusline).
-el.optStatusline.addEventListener("change", async () => {
-  const on = el.optStatusline.checked;
-  try {
-    await invoke(on ? "install_statusline_bridge" : "uninstall_statusline_bridge");
-  } catch (e) {
-    console.error("statusline bridge:", e);
-    el.optStatusline.checked = !on; // revertir si falló
-  }
-});
+bindClaudeToggle(el.optStatusline, "install_statusline_bridge", "uninstall_statusline_bridge");
 
 // En modo solo-lectura, los toggles que ESCRIBEN en settings.json (los hooks) se
 // deshabilitan: instalarlos fallaría en el backend por diseño.
@@ -383,6 +384,7 @@ if (el.optReadOnly) {
     try {
       await invoke("set_read_only", { enabled: on });
       setHookTogglesDisabled(on);
+      showHookError(null);
     } catch (e) {
       console.error("set_read_only:", e);
       el.optReadOnly.checked = !on; // revertir si falló
@@ -391,6 +393,21 @@ if (el.optReadOnly) {
 }
 
 // ---- Idioma ----
+// La bandeja la dibuja el backend: le pasamos sus textos en el idioma activo
+// (menú Mostrar/Ocultar/Salir + tooltip), al arrancar y al cambiar de idioma.
+function syncTrayLabels() {
+  const labels = {
+    show: t("tray_show"),
+    hide: t("tray_hide"),
+    quit: t("tray_quit"),
+    session: t("tray_session"),
+    weekly: t("tray_weekly"),
+    offline: t("tray_offline"),
+  };
+  invoke("set_tray_labels", { labels }).catch((e) => console.error("set_tray_labels:", e));
+}
+i18nReady.then(syncTrayLabels);
+
 // Primera opción: "Automático" (vuelve a la detección por SO, prefs.locale=null).
 const autoOpt = document.createElement("option");
 autoOpt.value = "auto";
@@ -424,6 +441,7 @@ el.optLang.addEventListener("change", async () => {
   autoOpt.textContent = autoLabel(); // re-traduce la etiqueta "Automático"
   applyStaticI18n();
   updatePinUi();
+  syncTrayLabels();
   if (ui.lastPayload) render(ui.lastPayload);
 });
 

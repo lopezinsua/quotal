@@ -98,6 +98,16 @@ export function snapTopLeft(pos, size, area, scale) {
   return { x: Math.round(x), y: Math.round(y) };
 }
 
+// Área ÚTIL del monitor (físicos): sin la barra de tareas de Windows, la barra de
+// menús/Dock de macOS o los paneles de Linux, si la API la expone (`workArea`,
+// Tauri ≥ 2.3); si no, el monitor completo. Colocar contra el monitor completo
+// dejaba el widget DEBAJO de la barra de tareas al elegir una posición inferior.
+export function workArea(mon) {
+  return mon.workArea && mon.workArea.size && mon.workArea.size.width > 0
+    ? mon.workArea
+    : { position: mon.position, size: mon.size };
+}
+
 // Monitor que CONTIENE el punto físico (x, y), o null si ninguno. Permite
 // restaurar un ancla guardada en SU monitor: en el arranque la ventana puede
 // nacer en otro, y acotar el ancla al monitor equivocado la arrastraría allí

@@ -70,6 +70,19 @@ describe("notifyFromPayload", () => {
     expect(sent).toHaveLength(2);
   });
 
+  it("un resets_at con variaciones de segundos sigue siendo la MISMA ventana", async () => {
+    const { notify, sent } = await setup();
+    notify.notifyFromPayload(plan(50, 0, "2026-07-01T15:00:00.000000+00:00"));
+    notify.notifyFromPayload(plan(92, 0, "2026-07-01T15:00:00.913233+00:00")); // aviso
+    notify.notifyFromPayload(plan(93, 0, "2026-07-01T14:59:59.120000+00:00")); // misma ventana
+    notify.notifyFromPayload(plan(94, 0, "2026-07-01T15:00:01+00:00"));
+    expect(sent).toHaveLength(1);
+    // La ventana siguiente (5 h después) sí re-arma.
+    notify.notifyFromPayload(plan(10, 0, "2026-07-01T20:00:00+00:00"));
+    notify.notifyFromPayload(plan(91, 0, "2026-07-01T20:00:00+00:00"));
+    expect(sent).toHaveLength(2);
+  });
+
   it("desactivado no envía, pero mantiene el baseline (sin aviso retroactivo)", async () => {
     const { notify, sent, prefs } = await setup({ enabled: false });
     notify.notifyFromPayload(plan(50));

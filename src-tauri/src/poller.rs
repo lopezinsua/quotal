@@ -46,7 +46,9 @@ fn classify(path: &Path, d: &mut Dirty) {
     } else if path.ends_with("sync.json") {
         d.sync = true;
     } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-        d.logs = true;
+        // Solo los transcripts de sesiones PRINCIPALES cuentan (y quedan como
+        // pista del más reciente); la actividad de subagentes no toca el contexto.
+        d.logs |= crate::claude_log_parser::note_activity(path);
     }
 }
 
@@ -84,6 +86,9 @@ async fn poll_loop(app: AppHandle, shared: SharedHandle) {
     );
     loop {
         tokio::time::sleep(POLL_FALLBACK).await;
+        // Sin eventos no hay pista del transcript activo: re-escanea cada vez para
+        // detectar sesiones nuevas.
+        crate::claude_log_parser::forget_activity();
         refresh_all(&shared);
         emit_active(&app, &shared);
     }
@@ -222,9 +227,42 @@ pub(crate) fn spawn_plan_poller(app: AppHandle, shared: SharedHandle) {
             // los decide `apply_plan` (así un 429 transitorio NO parpadea a "Sin
             // conexión" si ya teníamos datos válidos).
             apply_plan(&app, &shared, info);
-            tokio::time::sleep(if ok { PLAN_POLL } else { PLAN_POLL_BACKOFF }).await;
+            // Tras un 429 se espera lo que pida el servidor (o el backoff
+            // exponencial), no un intervalo fijo que prolongaría el bloqueo.
+            tokio::time::sleep(usage_api::next_poll_delay(ok, PLAN_POLL, PLAN_POLL_BACKOFF)).await;
         }
     });
+}
+
+/// Decide qué plan mostrar a partir del vigente, el recién obtenido y el respaldo
+/// del statusLine. Función PURA (sin estado ni IO) para poder testear la política:
+///   1. Dato nuevo bueno → ese.
+///   2. Nada usable antes → statusLine oficial o, en su defecto, el error.
+///   3. Plan bueno CONSERVADO tras un fallo → se mantiene, salvo que alguna de sus
+///      ventanas ya se haya reiniciado (dato de una ventana MUERTA, p. ej. tras
+///      horas de 429): entonces se prefiere el statusLine si refleja ventanas
+///      vigentes y, si no, se purgan solo las ventanas caducadas.
+pub(crate) fn merge_plan(
+    current: usage_api::PlanInfo,
+    fetched: usage_api::PlanInfo,
+    fallback: Option<usage_api::PlanInfo>,
+) -> usage_api::PlanInfo {
+    if fetched.available {
+        return fetched;
+    }
+    if !current.available {
+        return fallback.unwrap_or(fetched);
+    }
+    let mut kept = current;
+    if kept.session_window_expired() || kept.weekly_window_expired() {
+        match fallback {
+            Some(fb) if !fb.session_window_expired() && !fb.weekly_window_expired() => return fb,
+            _ => {
+                kept.clear_expired_windows();
+            }
+        }
+    }
+    kept
 }
 
 /// Guarda el plan en el estado, actualiza el icono/tooltip de la bandeja según
@@ -246,18 +284,12 @@ pub(crate) fn apply_plan(app: &AppHandle, shared: &SharedHandle, info: usage_api
             Ok(g) => g,
             Err(_) => return,
         };
-        if info.available {
-            guard.plan = info; // dato bueno (normalmente online)
-        } else if !guard.plan.available {
-            // No había nada usable: statusLine oficial o, en su defecto, el error.
-            guard.plan = fallback.unwrap_or(info);
-        }
-        // (si falló pero YA teníamos un plan bueno, no tocamos guard.plan)
+        guard.plan = merge_plan(std::mem::take(&mut guard.plan), info, fallback);
         let to_cache = if guard.plan.available { Some(guard.plan.clone()) } else { None };
         (
             guard.plan.session_status(),
             guard.plan.session_remaining(),
-            guard.plan.tray_tooltip(),
+            tray::tooltip_for(&guard.plan),
             to_cache,
         )
     };
@@ -266,5 +298,83 @@ pub(crate) fn apply_plan(app: &AppHandle, shared: &SharedHandle, info: usage_api
     // Persistimos el último plan bueno FUERA del lock (IO de disco).
     if let Some(p) = to_cache {
         usage_api::save_cache(&p);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use usage_api::PlanInfo;
+
+    fn iso(offset_mins: i64) -> String {
+        (chrono::Utc::now() + chrono::Duration::minutes(offset_mins)).to_rfc3339()
+    }
+
+    fn plan(session: f64, s_reset: String, weekly: f64, w_reset: String) -> PlanInfo {
+        PlanInfo {
+            name: "Pro".into(),
+            available: true,
+            session_percent: Some(session),
+            session_resets_at: Some(s_reset),
+            weekly_percent: Some(weekly),
+            weekly_resets_at: Some(w_reset),
+            ..Default::default()
+        }
+    }
+
+    fn failed() -> PlanInfo {
+        PlanInfo { error: Some("429".into()), ..Default::default() }
+    }
+
+    #[test]
+    fn dato_nuevo_bueno_siempre_gana() {
+        let viejo = plan(10.0, iso(60), 20.0, iso(600));
+        let nuevo = plan(55.0, iso(120), 30.0, iso(600));
+        assert_eq!(merge_plan(viejo, nuevo, None).session_percent, Some(55.0));
+    }
+
+    #[test]
+    fn fallo_sin_dato_previo_usa_statusline_o_el_error() {
+        let sl = plan(33.0, iso(60), 5.0, iso(600));
+        assert_eq!(merge_plan(PlanInfo::default(), failed(), Some(sl)).session_percent, Some(33.0));
+        let r = merge_plan(PlanInfo::default(), failed(), None);
+        assert!(!r.available);
+        assert_eq!(r.error.as_deref(), Some("429"));
+    }
+
+    #[test]
+    fn fallo_con_plan_vigente_lo_conserva() {
+        let vigente = plan(40.0, iso(60), 20.0, iso(600));
+        let sl = plan(1.0, iso(60), 1.0, iso(600));
+        // Un 429 transitorio NO cambia el dato bueno (ni por el statusLine).
+        assert_eq!(merge_plan(vigente, failed(), Some(sl)).session_percent, Some(40.0));
+    }
+
+    #[test]
+    fn fallo_con_sesion_caducada_prefiere_statusline_vigente() {
+        let congelado = plan(99.0, iso(-5), 20.0, iso(600));
+        let sl = plan(3.0, iso(290), 21.0, iso(600));
+        let r = merge_plan(congelado, failed(), Some(sl));
+        assert_eq!(r.session_percent, Some(3.0));
+    }
+
+    #[test]
+    fn fallo_con_sesion_caducada_sin_respaldo_purga_solo_la_sesion() {
+        let congelado = plan(99.0, iso(-5), 20.0, iso(600));
+        let r = merge_plan(congelado, failed(), None);
+        assert!(r.available);
+        assert_eq!(r.session_percent, None, "no se debe mostrar el 99% de una ventana muerta");
+        assert_eq!(r.session_resets_at, None);
+        assert_eq!(r.weekly_percent, Some(20.0), "la semana sigue vigente");
+    }
+
+    #[test]
+    fn fallo_con_semana_caducada_purga_la_semana() {
+        let congelado = plan(10.0, iso(60), 97.0, iso(-1));
+        // El statusLine también trae la semana caducada → no sirve; se purga.
+        let sl = plan(11.0, iso(60), 97.0, iso(-1));
+        let r = merge_plan(congelado, failed(), Some(sl));
+        assert_eq!(r.session_percent, Some(10.0));
+        assert_eq!(r.weekly_percent, None);
     }
 }
