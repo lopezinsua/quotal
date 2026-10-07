@@ -39,6 +39,13 @@ pub fn bridge_backup_path() -> PathBuf {
     widget_dir().join("bridge-backup.json")
 }
 
+/// Config de Kimi Code CLI (`[[hooks]]` del usuario, su api_key, providers…).
+/// Se edita de forma QUIRÚRGICA con `toml_edit` (ver `kimi_bridge.rs`): nunca se
+/// re-serializa entera para no perder comentarios ni formato.
+pub fn kimi_config_path() -> PathBuf {
+    home().join(".kimi-code").join("config.toml")
+}
+
 pub fn ensure_widget_dir() -> std::io::Result<()> {
     std::fs::create_dir_all(widget_dir())
 }

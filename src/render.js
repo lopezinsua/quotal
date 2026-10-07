@@ -3,6 +3,7 @@
 
 import { el, SOURCE_CLASSES, SEVERITY_CLASSES } from "./dom.js";
 import { ui } from "./state.js";
+import { prefs } from "./prefs.js";
 import { t } from "./i18n.js";
 import { pushSample, series } from "./history.js";
 import {
@@ -113,6 +114,20 @@ export function render(p) {
   el.card.classList.remove(...SOURCE_CLASSES);
   el.card.classList.add(`source-${m.source}`);
 
+  // Vista de proveedor elegida (prefs.providerView): "both" (default) enseña
+  // Claude + Kimi, "claude" solo Claude y "kimi" solo Kimi (con la píldora, la
+  // severidad de la tarjeta y la frescura alimentadas por Kimi).
+  const view = prefs.providerView || "both";
+  const kimiMode = view === "kimi";
+  const showClaude = view !== "kimi";
+
+  // Bloques de Claude: visibles salvo en modo "solo Kimi". La línea de contexto
+  // COMBINA su propio toggle (prefs.showContext) con la vista de proveedor.
+  el.planHead.classList.toggle("hidden", !showClaude);
+  el.sessionBlock.classList.toggle("hidden", !showClaude);
+  el.weeklyBlock.classList.toggle("hidden", !showClaude);
+  el.contextLine.classList.toggle("hidden", !showClaude || !prefs.showContext);
+
   // ---- Ventanas de uso REALES del plan (principal) ----
   const plan = p.plan || {};
   el.planName.textContent = plan.name || t("plan");
@@ -132,10 +147,38 @@ export function render(p) {
     ? fmtResetAt(plan.weekly_resets_at)
     : t("reset_dash");
 
+  // ---- Kimi (uso de Kimi Code, espejo de las ventanas del plan de Claude) ----
+  // Visibilidad según la vista de proveedor:
+  //  - "both":   solo si el backend encontró credenciales (kimi.configured).
+  //  - "claude": nunca.
+  //  - "kimi":   SIEMPRE; sin credenciales, el aviso kimi-no-creds sustituye a
+  //              las barras. Con `available:false` (fallo de red) los % vienen a
+  //              null y las barras caen a "—" solas, igual que las del plan.
+  const kimi = p.kimi || {};
+  const showKimi = kimiMode || (view === "both" && !!kimi.configured);
+  el.kimiSection.classList.toggle("hidden", !showKimi);
+  const showKimiBars = showKimi && !!kimi.configured;
+  el.kimiSessionBlock.classList.toggle("hidden", !showKimiBars);
+  el.kimiWeeklyBlock.classList.toggle("hidden", !showKimiBars);
+  el.kimiNoCreds.classList.toggle("hidden", !(kimiMode && !kimi.configured));
+  let kimiSessPct = null;
+  if (showKimiBars) {
+    kimiSessPct = renderUsagePct(el.kimiSessionFill, el.kimiSessionPct, kimi.session_percent, kimi.session_severity);
+    el.kimiSessionReset.textContent = kimi.session_resets_at
+      ? fmtResetIn(kimi.session_resets_at)
+      : t("reset_dash");
+
+    renderUsagePct(el.kimiWeeklyFill, el.kimiWeeklyPct, kimi.weekly_percent, kimi.weekly_severity);
+    el.kimiWeeklyReset.textContent = kimi.weekly_resets_at
+      ? fmtResetAt(kimi.weekly_resets_at)
+      : t("reset_dash");
+  }
+
   // Aviso visual del widget según la peor severidad. La clase también conmuta el
-  // token semántico `--state`, del que cuelgan píldora, sparkline y delta.
+  // token semántico `--state`, del que cuelgan píldora, sparkline y delta. En
+  // modo "solo Kimi" la fuente es Kimi (mismo formato de campos que el plan).
   el.card.classList.remove(...SEVERITY_CLASSES);
-  const sev = worstSeverity(plan);
+  const sev = worstSeverity(kimiMode ? kimi : plan);
   if (sev === "critical") el.card.classList.add("sev-critical");
   else if (sev === "warning") el.card.classList.add("sev-warning");
 
@@ -146,11 +189,13 @@ export function render(p) {
   if (fresh && sessPct != null) flash(el.sessionPct);
 
   // Píldora: los tres estilos se alimentan del MISMO % de sesión y heredan el
-  // color de estado vía `--state`. Actualizamos los tres indicadores siempre; el
-  // CSS muestra solo el del estilo activo, así cambiar de estilo es instantáneo.
-  const pillFrac = sessPct == null ? 0 : Math.min(100, Math.max(0, sessPct)) / 100;
-  if (sessPct != null) {
-    countTo(el.pillPct, sessPct, (v) => `${Math.round(v)}%`);
+  // color de estado vía `--state`. En modo "solo Kimi" el % es el de la ventana
+  // de 5 h de Kimi. Actualizamos los tres indicadores siempre; el CSS muestra
+  // solo el del estilo activo, así cambiar de estilo es instantáneo.
+  const pillPctSrc = kimiMode ? kimiSessPct : sessPct;
+  const pillFrac = pillPctSrc == null ? 0 : Math.min(100, Math.max(0, pillPctSrc)) / 100;
+  if (pillPctSrc != null) {
+    countTo(el.pillPct, pillPctSrc, (v) => `${Math.round(v)}%`);
   } else {
     el.pillPct.textContent = "—";
     delete el.pillPct.dataset.val;
@@ -182,17 +227,19 @@ export function render(p) {
   el.contextPct.textContent = ctxParts.length ? ctxParts.join(" · ") : "—";
 
   // ---- Frescura ----
-  // Distinguimos tres estados para ser HONESTOS con el dato:
+  // En modo "solo Kimi" refleja el dato de Kimi (fetched_at/error); si no, el de
+  // Claude. Distinguimos tres estados para ser HONESTOS con el dato:
   //  - sin dato           -> "Sin conexión con Claude; <motivo>"
   //  - dato OFFLINE (statusLine, sin red) → lo marcamos como tal
   //  - dato en vivo (online) -> "Última actualización: hace X"
+  const freshSrc = kimiMode ? kimi : plan;
   el.freshness.classList.remove("offline");
-  if (plan.available === false) {
-    el.freshness.textContent = t("no_conn", { err: plan.error || "—" });
+  if (freshSrc.available === false) {
+    el.freshness.textContent = t("no_conn", { err: freshSrc.error || "—" });
     el.freshness.classList.add("offline");
   } else {
-    const fresh = fmtFreshness(secsSince(plan.fetched_at));
-    const isOffline = plan.source && plan.source !== "online";
+    const fresh = fmtFreshness(secsSince(freshSrc.fetched_at));
+    const isOffline = freshSrc.source && freshSrc.source !== "online";
     if (isOffline) {
       el.freshness.textContent = t("offline_sl", { fresh });
       el.freshness.classList.add("offline");

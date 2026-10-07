@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Kimi Code support.** Quotal also shows your Kimi usage (5-hour window, read
+  from `api.kimi.com` with Kimi Code's local credentials). A new "Show" setting
+  picks Claude, Kimi or both, and "Open/Close with Kimi Code" install reversible
+  `SessionStart`/`SessionEnd` hooks in `~/.kimi-code/config.toml` (edited in
+  place, preserving your comments and formatting).
+
 ### Fixed
 - **Never overwrites a broken `settings.json`.** If Claude Code's `settings.json`
   can't be parsed (a stray trailing comma, or a read while Claude Code was

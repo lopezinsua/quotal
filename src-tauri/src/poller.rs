@@ -6,7 +6,7 @@
 //      respaldo offline del statusLine y conservación del último dato bueno.
 
 use crate::state::SharedHandle;
-use crate::{paths, providers, tray, usage_api, SRC_HOOK, SRC_LOGS, SRC_SYNC};
+use crate::{kimi_usage, paths, providers, tray, usage_api, SRC_HOOK, SRC_LOGS, SRC_SYNC};
 use std::path::Path;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
@@ -298,6 +298,68 @@ pub(crate) fn apply_plan(app: &AppHandle, shared: &SharedHandle, info: usage_api
     // Persistimos el último plan bueno FUERA del lock (IO de disco).
     if let Some(p) = to_cache {
         usage_api::save_cache(&p);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KIMI (Kimi Code CLI): sondeo de `/coding/v1/usages`, espejo del poller del
+// plan pero SIN tocar el icono de bandeja (eso es solo de Claude) y SIN
+// respaldo de statusLine (Kimi no lo expone).
+// ---------------------------------------------------------------------------
+
+/// Bucle que sondea `/coding/v1/usages` periódicamente y empuja los datos reales
+/// de Kimi al frontend. Misma cadencia que el plan: 60s en vivo, 180s tras fallo.
+pub(crate) fn spawn_kimi_poller(app: AppHandle, shared: SharedHandle) {
+    // Muestra al instante el último dato cacheado mientras llega el primer sondeo.
+    if let Some(cached) = kimi_usage::load_cache() {
+        apply_kimi(&app, &shared, cached);
+    }
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let info = kimi_usage::fetch().await;
+            let ok = info.available;
+            if !ok && info.configured {
+                log::warn!(
+                    "sondeo de Kimi sin datos en vivo: {}",
+                    info.error.as_deref().unwrap_or("motivo desconocido")
+                );
+            }
+            apply_kimi(&app, &shared, info);
+            tokio::time::sleep(if ok { PLAN_POLL } else { PLAN_POLL_BACKOFF }).await;
+        }
+    });
+}
+
+/// Guarda el dato de Kimi en el estado y empuja el payload al frontend.
+///
+/// Política ante un fetch FALLIDO (red/429), más simple que la del plan:
+///   1. Si ya teníamos un dato bueno y el fallo es con credenciales presentes
+///      -> lo CONSERVAMOS (un fallo transitorio no parpadea a error).
+///   2. Si no teníamos nada, o el resultado es "sin credenciales" -> mostramos
+///      el nuevo estado (honestos: el `configured:false` manda sobre un dato
+///      congelado de una sesión de Kimi que ya no existe).
+pub(crate) fn apply_kimi(app: &AppHandle, shared: &SharedHandle, info: kimi_usage::KimiPlanInfo) {
+    let to_cache = {
+        let mut guard = match shared.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        if info.available {
+            guard.kimi = info; // dato bueno (online o caché al arrancar)
+        } else if !guard.kimi.available || !info.configured {
+            guard.kimi = info;
+        }
+        // (si falló pero YA teníamos un dato bueno, no tocamos guard.kimi)
+        if guard.kimi.available {
+            Some(guard.kimi.clone())
+        } else {
+            None
+        }
+    };
+    emit_active(app, shared);
+    // Persistimos el último dato bueno FUERA del lock (IO de disco).
+    if let Some(k) = to_cache {
+        kimi_usage::save_cache(&k);
     }
 }
 

@@ -98,7 +98,7 @@
 
         <section id="metrics-view" class="body">
           <!-- Cabecera del plan -->
-          <div class="plan-head">
+          <div id="plan-head" class="plan-head">
             <span id="plan-name" class="plan-name">Pro</span>
             <span class="plan-sub" data-i18n="plan_limits">Plan usage limits</span>
           </div>
@@ -147,6 +147,52 @@
             <div class="usage-foot">
               <span id="weekly-reset" class="usage-reset">—</span>
             </div>
+          </div>
+
+          <!-- Kimi · límites de uso de Kimi Code (ventana de 5 h + semanal).
+               Oculta por defecto: render.js decide su visibilidad según la vista
+               de proveedor (prefs.providerView): en "both" solo si el backend
+               encontró credenciales (kimi.configured), en "kimi" SIEMPRE, en
+               "claude" nunca. Reutiliza las mismas clases de las stat-rows
+               compactas de Claude. -->
+          <div id="kimi-section" class="hidden">
+            <div class="plan-head">
+              <span class="plan-name" data-i18n="kimi">Kimi</span>
+              <span class="plan-sub" data-i18n="kimi_limits">Límites de uso de Kimi</span>
+            </div>
+
+            <!-- Ventana de 5 h de Kimi · stat-row compacta -->
+            <div id="kimi-session-block" class="usage-block compact">
+              <div class="usage-row">
+                <span class="usage-name" data-i18n="kimi_window">Ventana de 5 h</span>
+                <span id="kimi-session-pct" class="usage-pct">—</span>
+              </div>
+              <div class="progress-track">
+                <div id="kimi-session-fill" class="progress-fill session"></div>
+              </div>
+              <div class="usage-foot">
+                <span id="kimi-session-reset" class="usage-reset">—</span>
+              </div>
+            </div>
+
+            <!-- Semanal de Kimi · stat-row compacta -->
+            <div id="kimi-weekly-block" class="usage-block compact">
+              <div class="usage-row">
+                <span class="usage-name" data-i18n="weekly">Weekly · all models</span>
+                <span id="kimi-weekly-pct" class="usage-pct">—</span>
+              </div>
+              <div class="progress-track">
+                <div id="kimi-weekly-fill" class="progress-fill weekly"></div>
+              </div>
+              <div class="usage-foot">
+                <span id="kimi-weekly-reset" class="usage-reset">—</span>
+              </div>
+            </div>
+
+            <!-- Aviso de "sin credenciales": solo se muestra en la vista "Solo
+                 Kimi" cuando el backend no encontró credenciales (sustituye a
+                 las barras). En "both" la sección entera se oculta en ese caso. -->
+            <p id="kimi-no-creds" class="freshness hidden" data-i18n="kimi_no_creds">Inicia sesión en Kimi Code para ver tu uso</p>
           </div>
 
           <!-- Contexto · stat-row compacta (secundaria, opcional) -->
@@ -239,6 +285,14 @@
             <input type="checkbox" id="opt-show-context" checked />
           </label>
           <label class="setting-row">
+            <span data-i18n="opt_provider_view">Show</span>
+            <select id="opt-provider-view" class="lang-select">
+              <option value="both" data-i18n="pv_both">Claude + Kimi</option>
+              <option value="claude" data-i18n="pv_claude">Claude only</option>
+              <option value="kimi" data-i18n="pv_kimi">Kimi only</option>
+            </select>
+          </label>
+          <label class="setting-row">
             <span data-i18n="opt_notify">Notify me near the limit</span>
             <input type="checkbox" id="opt-notify" />
           </label>
@@ -277,6 +331,14 @@
           <label class="setting-row">
             <span data-i18n="opt_close">Close with Claude Code</span>
             <input type="checkbox" id="opt-close" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_kimi_autostart">Open with Kimi Code</span>
+            <input type="checkbox" id="opt-kimi-autostart" />
+          </label>
+          <label class="setting-row">
+            <span data-i18n="opt_kimi_close">Close with Kimi Code</span>
+            <input type="checkbox" id="opt-kimi-close" />
           </label>
           <label class="setting-row">
             <span data-i18n="opt_statusline">Official context (statusLine)</span>
