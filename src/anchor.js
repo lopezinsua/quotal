@@ -12,7 +12,7 @@
 import { invoke, win, currentMonitor, availableMonitors, PhysicalPosition } from "./tauri.js";
 import { prefs, savePrefs, fullSize, pillSize } from "./prefs.js";
 import { ui } from "./state.js";
-import { clamp, pickMonitor, getSF, monitorFromPoint, snapTopLeft } from "./geometry.js";
+import { clamp, pickMonitor, getSF, monitorFromPoint, snapTopLeft, workArea } from "./geometry.js";
 
 // Silencia el guardado de posición durante un breve margen tras un movimiento
 // PROPIO (set_bounds / setPosition), para que no se confunda con un arrastre del
@@ -125,9 +125,7 @@ export async function snapToEdges() {
     if (!mon) return;
     const pos = await win.outerPosition();
     const size = await win.outerSize();
-    const area =
-      mon.workArea && mon.workArea.size ? mon.workArea : { position: mon.position, size: mon.size };
-    const tl = snapTopLeft(pos, size, area, mon.scaleFactor || 1);
+    const tl = snapTopLeft(pos, size, workArea(mon), mon.scaleFactor || 1);
     if (tl.x !== pos.x || tl.y !== pos.y) {
       await setPos(new PhysicalPosition(tl.x, tl.y));
     }
@@ -146,16 +144,35 @@ export async function captureAnchor() {
   }
 }
 
-// Posición por defecto: esquina superior derecha del monitor, con margen.
+// Posición por defecto: esquina superior derecha del área útil, con margen.
 async function defaultTopRight(target) {
   const mon = await pickMonitor();
   if (!mon) return null;
-  const scale = mon.scaleFactor || 1;
-  const margin = 12 * scale;
-  const tw = target.w * scale;
-  const x = mon.position.x + mon.size.width - tw - margin;
-  const y = mon.position.y + margin;
-  return new PhysicalPosition(Math.round(x), Math.round(y));
+  const p = placeInArea("right", "top", target, mon);
+  return new PhysicalPosition(p.x, p.y);
+}
+
+// Cálculo PURO de la posición física para un anclaje {h: left|center|right,
+// v: top|middle|bottom} dentro del área útil del monitor, con el margen estándar.
+export function placeInArea(h, v, target, mon) {
+  const s = mon.scaleFactor || 1;
+  const m = 12 * s;
+  const tw = target.w * s;
+  const th = target.h * s;
+  const { position, size } = workArea(mon);
+  const x =
+    h === "left"
+      ? position.x + m
+      : h === "right"
+        ? position.x + size.width - tw - m
+        : position.x + (size.width - tw) / 2;
+  const y =
+    v === "top"
+      ? position.y + m
+      : v === "bottom"
+        ? position.y + size.height - th - m
+        : position.y + (size.height - th) / 2;
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 // La posición (físicos) deja la ventana visible en algún monitor?
@@ -227,15 +244,6 @@ export function gridTarget() {
 export async function anchorPosition(h, v, target) {
   const mon = await pickMonitor();
   if (!mon) return null;
-  const s = mon.scaleFactor || 1;
-  const m = 12 * s;
-  const tw = target.w * s;
-  const th = target.h * s;
-  const mx = mon.position.x;
-  const my = mon.position.y;
-  const mw = mon.size.width;
-  const mh = mon.size.height;
-  const x = h === "left" ? mx + m : h === "right" ? mx + mw - tw - m : mx + (mw - tw) / 2;
-  const y = v === "top" ? my + m : v === "bottom" ? my + mh - th - m : my + (mh - th) / 2;
-  return new PhysicalPosition(Math.round(x), Math.round(y));
+  const p = placeInArea(h, v, target, mon);
+  return new PhysicalPosition(p.x, p.y);
 }

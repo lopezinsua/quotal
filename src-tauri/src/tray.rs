@@ -3,6 +3,7 @@
 // Icono y menú nativo de bandeja. El texto del primer ítem alterna entre
 // "Mostrar widget" / "Ocultar widget" según el estado real de la ventana,
 // para no desincronizarse nunca. "Salir" es la única vía de cierre limpio.
+// Los textos llegan traducidos desde el frontend (`set_tray_labels`).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
@@ -25,20 +26,87 @@ pub fn set_tray_static(on: bool) {
 // icono se DIBUJA dinámicamente con `gauge_icon` según el uso de la sesión.
 const ICON_NORMAL: &[u8] = include_bytes!("../icons/tray-normal.png");
 
-/// Guardamos el ítem de toggle para poder actualizar su texto al vuelo.
+/// Guardamos los ítems del menú para poder actualizar su texto al vuelo.
 pub struct TrayState {
     toggle: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
 }
 
-const SHOW_TEXT: &str = "Mostrar widget";
-const HIDE_TEXT: &str = "Ocultar widget";
+/// Textos de la bandeja (menú + tooltip) en el idioma de la UI. El frontend, que
+/// es quien resuelve el idioma, los envía al arrancar y al cambiar de idioma;
+/// hasta entonces se usa el inglés (el idioma fuente de la app).
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct TrayLabels {
+    pub show: String,
+    pub hide: String,
+    pub quit: String,
+    pub session: String,
+    pub weekly: String,
+    pub offline: String,
+}
+
+impl Default for TrayLabels {
+    fn default() -> Self {
+        TrayLabels {
+            show: "Show widget".into(),
+            hide: "Hide widget".into(),
+            quit: "Quit".into(),
+            session: "Session".into(),
+            weekly: "Week".into(),
+            offline: "offline".into(),
+        }
+    }
+}
+
+fn labels_cell() -> &'static std::sync::Mutex<TrayLabels> {
+    static LABELS: std::sync::OnceLock<std::sync::Mutex<TrayLabels>> = std::sync::OnceLock::new();
+    LABELS.get_or_init(|| std::sync::Mutex::new(TrayLabels::default()))
+}
+
+fn labels() -> TrayLabels {
+    labels_cell().lock().map(|l| l.clone()).unwrap_or_default()
+}
+
+/// Fija los textos traducidos y refresca los del menú al instante. (El tooltip
+/// lo redibuja quien llama, que tiene el plan a mano.)
+pub fn set_labels(app: &AppHandle, new: TrayLabels) {
+    if let Ok(mut l) = labels_cell().lock() {
+        *l = new;
+    }
+    if let Some(state) = app.try_state::<TrayState>() {
+        let _ = state.quit.set_text(labels().quit);
+    }
+    sync_toggle_label(app);
+}
+
+/// Tooltip de la bandeja para un plan, en el idioma vigente. Función PURA salvo
+/// por la lectura de los textos.
+pub fn tooltip_for(plan: &crate::usage_api::PlanInfo) -> String {
+    tooltip_with(plan, &labels())
+}
+
+fn tooltip_with(plan: &crate::usage_api::PlanInfo, l: &TrayLabels) -> String {
+    if !plan.available {
+        return format!("Claude {} · {}", plan.name, l.offline);
+    }
+    let fmt = |p: Option<f64>| p.map(|p| format!("{p:.0}%")).unwrap_or_else(|| "—".into());
+    format!(
+        "Claude {} · {} {} · {} {}",
+        plan.name,
+        l.session,
+        fmt(plan.session_percent),
+        l.weekly,
+        fmt(plan.weekly_percent)
+    )
+}
 
 pub fn create_tray(app: &App<Wry>) -> tauri::Result<()> {
-    let toggle = MenuItem::with_id(app, "toggle", HIDE_TEXT, true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?;
+    let l = labels();
+    let toggle = MenuItem::with_id(app, "toggle", &l.hide, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", &l.quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &quit])?;
 
-    app.manage(TrayState { toggle: toggle.clone() });
+    app.manage(TrayState { toggle: toggle.clone(), quit: quit.clone() });
 
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .tooltip("Quotal")
@@ -189,7 +257,8 @@ pub fn set_gauge(app: &AppHandle, remaining: Option<f64>, severity: &str, toolti
 pub fn sync_toggle_label(app: &AppHandle) {
     let visible = app.get_webview_window("main").and_then(|w| w.is_visible().ok()).unwrap_or(false);
     if let Some(state) = app.try_state::<TrayState>() {
-        let _ = state.toggle.set_text(if visible { HIDE_TEXT } else { SHOW_TEXT });
+        let l = labels();
+        let _ = state.toggle.set_text(if visible { l.hide } else { l.show });
     }
 }
 
@@ -241,4 +310,36 @@ pub(crate) fn quit_clean(app: &AppHandle) {
         std::thread::sleep(std::time::Duration::from_millis(200));
         handle.exit(0);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::usage_api::PlanInfo;
+
+    #[test]
+    fn el_tooltip_usa_los_textos_del_idioma() {
+        let es = TrayLabels {
+            show: "Mostrar".into(),
+            hide: "Ocultar".into(),
+            quit: "Salir".into(),
+            session: "Sesión".into(),
+            weekly: "Semana".into(),
+            offline: "sin conexión".into(),
+        };
+        let plan = PlanInfo {
+            name: "Max".into(),
+            available: true,
+            session_percent: Some(41.6),
+            weekly_percent: None,
+            ..Default::default()
+        };
+        assert_eq!(tooltip_with(&plan, &es), "Claude Max · Sesión 42% · Semana —");
+        assert_eq!(
+            tooltip_with(&plan, &TrayLabels::default()),
+            "Claude Max · Session 42% · Week —"
+        );
+        let caido = PlanInfo { name: "Pro".into(), ..Default::default() };
+        assert_eq!(tooltip_with(&caido, &es), "Claude Pro · sin conexión");
+    }
 }

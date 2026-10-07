@@ -30,7 +30,7 @@ export const SUPPORTED = {
 const RTL = new Set(["ar"]);
 
 // Idioma fuente (inglés). `_auto` es la etiqueta de la opción "Automático".
-const BASE = {
+export const BASE = {
   title_pill: "Claude usage — hover to view",
   t_refresh: "Refresh now",
   t_pin: "Pin / unpin",
@@ -74,6 +74,17 @@ const BASE = {
   opt_statusline: "Official context (statusLine)",
   opt_readonly: "Read-only mode (observer)",
   opt_readonly_hint: "Never writes back your token or installs hooks",
+  hook_failed: "Couldn't apply it: {err}",
+  hook_err_read_only: "Read-only mode is on: Quotal won't change Claude Code's settings.",
+  hook_err_node: "Node.js isn't on your PATH, and the statusLine bridge needs it.",
+  hook_err_settings:
+    "Your Claude Code settings.json has a syntax error, so Quotal left it untouched. Fix it and try again.",
+  tray_show: "Show widget",
+  tray_hide: "Hide widget",
+  tray_quit: "Quit",
+  tray_session: "Session",
+  tray_weekly: "Week",
+  tray_offline: "offline",
   opt_notify: "Notify me near the limit",
   opt_notify_at: "Notify at",
   notify_title: "Quotal — usage alert",

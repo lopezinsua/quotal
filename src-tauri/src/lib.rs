@@ -132,6 +132,7 @@ pub fn run() {
             commands::read_only_status,
             commands::set_read_only,
             commands::set_tray_static,
+            commands::set_tray_labels,
             commands::hide_to_tray,
             commands::set_bounds,
             commands::animate_bounds,

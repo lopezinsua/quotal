@@ -5,6 +5,49 @@ All notable changes to Quotal are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Never overwrites a broken `settings.json`.** If Claude Code's `settings.json`
+  can't be parsed (a stray trailing comma, or a read while Claude Code was
+  rewriting it), installing or removing any hook used to start from `{}` and
+  write over it, **wiping your whole Claude Code config**. Quotal now leaves the
+  file untouched and tells you why.
+- **Rate limits (429) are respected.** Quotal honours the server's `Retry-After`
+  and otherwise backs off exponentially (2 → 4 → 8 … up to 30 min) instead of
+  retrying every 3 minutes, which could keep the limit going for hours. The
+  refresh button no longer hits the endpoint while the limit is active.
+- **No more "99% · resets now" from a dead window.** When the live data can't be
+  refreshed, a session or weekly window whose reset time has passed is no longer
+  shown frozen: Quotal uses the statusLine data if it's current, or shows "—".
+  The same applies to the cached plan shown at startup.
+- **Context of your session, not a subagent's.** Subagent transcripts
+  (`subagents/agent-*.jsonl`) were picked as "the latest session" while they ran.
+  They're now ignored, sessions over 200k are measured against the 1M window, and
+  the watcher no longer rescans every transcript on each write.
+- **Placement respects the taskbar / menu bar.** The position grid and the
+  default position now use the monitor's work area, so bottom positions no longer
+  land under the Windows taskbar (or the top one under the macOS menu bar).
+- **Corrupted preferences can't hide the widget.** Unreadable saved preferences
+  used to stop the UI from starting, leaving the (initially hidden) window
+  invisible. They now fall back to defaults.
+- Usage notifications no longer fire twice in the same window when the server's
+  reset timestamp shifts by a few seconds between polls.
+- Linux: no more false "3 missing system dependencies" warning when `ldconfig`
+  isn't on the user's `PATH` (Debian).
+- "Resets in 0m" during the last minute now reads "Resets in 1m".
+
+### Changed
+- **Toggle errors are explained.** When "Open/Close with Claude Code" or
+  "Official context" can't be applied (read-only mode, a broken `settings.json`,
+  Node.js missing), Settings now says why instead of silently flipping back.
+- The statusLine bridge now refuses to install when Node.js isn't on the `PATH`
+  (it would have left you with no status line), and keeps your `statusLine`
+  options such as `padding`.
+- **Translated tray menu and tooltip** (they were always in Spanish), and 11
+  strings that were still in English in 9 languages are now translated. A test
+  keeps every language in sync with the English source.
+
 ## [0.3.4] — 2026-07-10
 
 ### Fixed

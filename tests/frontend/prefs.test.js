@@ -2,7 +2,7 @@
 // persisten con debounce (tamaño/posición); `flushPrefs` debe vaciar ese trabajo
 // pendiente y persistir a localStorage de una sola vez, para no perder el último
 // ajuste del usuario si la app se cierra antes de que salte el temporizador.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const { onFlushPrefs, flushPrefs, prefs, PREFS_KEY } = await import("../../src/prefs.js");
 
@@ -41,5 +41,35 @@ describe("flushPrefs", () => {
     expect(localStorage.getItem(PREFS_KEY)).not.toBeNull();
     off1();
     off2();
+  });
+});
+
+// Un `widget-prefs` corrupto NO puede tumbar el arranque: prefs.js se evalúa al
+// importarse y, si lanzara, main.js no llegaría a mostrar la ventana (nace oculta).
+describe("carga de preferencias guardadas", () => {
+  const fresh = async (stored) => {
+    vi.resetModules();
+    localStorage.clear();
+    if (stored !== undefined) localStorage.setItem("widget-prefs", stored);
+    return import("../../src/prefs.js");
+  };
+
+  it("con JSON corrupto arranca con los valores de fábrica", async () => {
+    const { prefs } = await fresh("{roto");
+    expect(prefs.onTop).toBe(true);
+    expect(prefs.collapsed).toBe(false);
+  });
+
+  it("ignora un valor guardado que no es un objeto", async () => {
+    const { prefs } = await fresh("[1,2,3]");
+    expect(prefs.pillStyle).toBe("bar");
+    expect(prefs[0]).toBeUndefined();
+  });
+
+  it("mezcla lo guardado sobre los valores de fábrica", async () => {
+    const { prefs } = await fresh(JSON.stringify({ collapsed: true, theme: "light" }));
+    expect(prefs.collapsed).toBe(true);
+    expect(prefs.theme).toBe("light");
+    expect(prefs.onTop).toBe(true);
   });
 });

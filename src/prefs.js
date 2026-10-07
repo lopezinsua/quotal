@@ -66,11 +66,30 @@ export const prefs = Object.assign(
     // nueva, vuelve a aparecer.
     dismissedUpdate: null,
   },
-  JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"),
+  loadStoredPrefs(),
 );
 
-export const savePrefs = () =>
-  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+// Lee las preferencias guardadas SIN poder romper el arranque: si el JSON está
+// corrupto (o el storage no está disponible), este módulo lanzaría al importarse,
+// `main.js` no llegaría a ejecutarse y la ventana —que nace oculta— no se
+// mostraría nunca. Ante cualquier problema, se arranca con los valores por defecto.
+function loadStoredPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  } catch (e) {
+    console.warn("prefs: preferencias guardadas ilegibles, se usan las de fábrica:", e);
+    return {};
+  }
+}
+
+export const savePrefs = () => {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (e) {
+    console.error("savePrefs:", e);
+  }
+};
 
 // --- Vaciado de guardados diferidos ---------------------------------------
 // Algunos ajustes se persisten con DEBOUNCE (el tamaño tras redimensionar, el

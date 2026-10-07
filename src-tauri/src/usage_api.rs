@@ -111,19 +111,46 @@ impl PlanInfo {
         self.session_percent.map(|p| ((100.0 - p) / 100.0).clamp(0.0, 1.0))
     }
 
-    /// Texto para el tooltip de la bandeja del sistema.
-    pub fn tray_tooltip(&self) -> String {
-        if !self.available {
-            return format!("Claude {} · sin conexión", self.name);
-        }
-        let fmt = |p: Option<f64>| p.map(|p| format!("{p:.0}%")).unwrap_or_else(|| "—".into());
-        format!(
-            "Claude {} · Sesión {} · Semana {}",
-            self.name,
-            fmt(self.session_percent),
-            fmt(self.weekly_percent)
-        )
+    /// ¿La ventana de sesión (5h) YA se reinició (su `resets_at` está en el pasado)?
+    /// Entonces su `%` pertenece a una ventana MUERTA: pasa al conservar el último
+    /// plan bueno mientras `/usage` nos limita con 429 durante horas, o al cargar
+    /// la caché de una ejecución anterior. Ausente o no parseable → `false`.
+    pub fn session_window_expired(&self) -> bool {
+        reset_passed(self.session_resets_at.as_deref())
     }
+
+    /// Ídem para la ventana semanal (7d).
+    pub fn weekly_window_expired(&self) -> bool {
+        reset_passed(self.weekly_resets_at.as_deref())
+    }
+
+    /// Purga los campos de cada ventana YA reiniciada (la otra queda intacta). La UI
+    /// muestra "—" ("no lo sé ahora mismo") en vez de "99% · se restablece ahora".
+    /// Devuelve `true` si purgó algo.
+    pub(crate) fn clear_expired_windows(&mut self) -> bool {
+        let mut changed = false;
+        if self.session_window_expired() {
+            self.session_percent = None;
+            self.session_resets_at = None;
+            self.session_severity = None;
+            changed = true;
+        }
+        if self.weekly_window_expired() {
+            self.weekly_percent = None;
+            self.weekly_resets_at = None;
+            self.weekly_severity = None;
+            changed = true;
+        }
+        changed
+    }
+}
+
+/// ¿Este instante de reset (RFC 3339) ya pasó? Ausente o ilegible → `false` (no
+/// se purga un dato por ambigüedad).
+fn reset_passed(at: Option<&str>) -> bool {
+    at.and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|t| chrono::Utc::now() >= t.with_timezone(&chrono::Utc))
+        .unwrap_or(false)
 }
 
 fn credentials_path() -> PathBuf {
@@ -152,10 +179,14 @@ pub fn save_cache(info: &PlanInfo) {
     }
 }
 
-/// Carga el último plan cacheado (si lo hay y es válido).
+/// Carga el último plan cacheado (si lo hay y es válido), sin las ventanas que ya
+/// se reiniciaron desde entonces (abrir el widget al día siguiente no debe enseñar
+/// el % de ayer como si fuera de ahora).
 pub fn load_cache() -> Option<PlanInfo> {
     let raw = std::fs::read_to_string(cache_path()).ok()?;
-    serde_json::from_str::<PlanInfo>(&raw).ok().filter(|p| p.available)
+    let mut plan = serde_json::from_str::<PlanInfo>(&raw).ok().filter(|p| p.available)?;
+    plan.clear_expired_windows();
+    Some(plan)
 }
 
 struct Creds {
@@ -335,6 +366,99 @@ fn http_client() -> &'static reqwest::Client {
             .build()
             .unwrap_or_default()
     })
+}
+
+// ---------------------------------------------------------------------------
+// Limitador ante 429: `/api/oauth/usage` limita con fuerza. Seguir llamando con
+// un intervalo fijo (o con el botón de refrescar) mantiene el bloqueo durante
+// horas. Respetamos `Retry-After` si viene y, si no, backoff EXPONENCIAL; hasta
+// que vence, `fetch()` no toca la red (tampoco el refresco manual).
+// ---------------------------------------------------------------------------
+
+/// Espera mínima tras un 429 sin `Retry-After` (se dobla con cada 429 seguido).
+const BACKOFF_BASE_SECS: u64 = 120;
+/// Techo del backoff: nunca más de 30 min sin reintentar.
+const BACKOFF_MAX_SECS: u64 = 1800;
+
+#[derive(Default)]
+struct RateGate {
+    /// No llamar al endpoint antes de este instante.
+    until: Option<std::time::Instant>,
+    /// 429 consecutivos (determina el exponente del backoff).
+    strikes: u32,
+}
+
+fn rate_gate() -> &'static Mutex<RateGate> {
+    static GATE: OnceLock<Mutex<RateGate>> = OnceLock::new();
+    GATE.get_or_init(|| Mutex::new(RateGate::default()))
+}
+
+/// Backoff exponencial PURO: 120s, 240s, 480s… con techo de 30 min.
+fn backoff_secs(strikes: u32) -> u64 {
+    BACKOFF_BASE_SECS.saturating_mul(1u64 << strikes.min(10)).min(BACKOFF_MAX_SECS)
+}
+
+/// Interpreta `Retry-After` (segundos o fecha HTTP). Función PURA. Acota a
+/// [1s, 1h] para que un valor absurdo no congele el widget ni lo haga martillear.
+fn parse_retry_after(value: &str, now: chrono::DateTime<chrono::Utc>) -> Option<u64> {
+    let v = value.trim();
+    let secs = match v.parse::<u64>() {
+        Ok(s) => s,
+        Err(_) => {
+            let at = chrono::DateTime::parse_from_rfc2822(v).ok()?.with_timezone(&chrono::Utc);
+            (at - now).num_seconds().max(0) as u64
+        }
+    };
+    Some(secs.clamp(1, 3600))
+}
+
+/// Registra un 429 y abre la ventana de espera. Devuelve los segundos de espera.
+fn note_rate_limited(retry_after: Option<&str>) -> u64 {
+    let mut g = rate_gate().lock().unwrap_or_else(|e| e.into_inner());
+    let backoff = backoff_secs(g.strikes);
+    // Si el servidor dice cuánto esperar, manda él (pero nunca menos que la base
+    // del backoff: un `Retry-After: 1` repetido no debe convertirse en martilleo).
+    let wait = retry_after
+        .and_then(|v| parse_retry_after(v, chrono::Utc::now()))
+        .map(|s| s.max(BACKOFF_BASE_SECS.min(backoff)))
+        .unwrap_or(backoff);
+    g.strikes = g.strikes.saturating_add(1);
+    g.until = Some(std::time::Instant::now() + std::time::Duration::from_secs(wait));
+    wait
+}
+
+/// Un fetch correcto cierra el limitador.
+fn note_success() {
+    let mut g = rate_gate().lock().unwrap_or_else(|e| e.into_inner());
+    *g = RateGate::default();
+}
+
+/// Segundos que faltan para poder volver a llamar al endpoint (0 = ya se puede).
+fn rate_limited_for() -> u64 {
+    let g = rate_gate().lock().unwrap_or_else(|e| e.into_inner());
+    g.until
+        .and_then(|u| u.checked_duration_since(std::time::Instant::now()))
+        .map(|d| d.as_secs().max(1))
+        .unwrap_or(0)
+}
+
+/// Cuánto debe dormir el sondeo antes del siguiente intento: si hay un 429 en
+/// curso, lo que quede de su ventana; si no, el intervalo normal o el de fallo.
+pub fn next_poll_delay(
+    ok: bool,
+    normal: std::time::Duration,
+    on_error: std::time::Duration,
+) -> std::time::Duration {
+    match rate_limited_for() {
+        0 if ok => normal,
+        0 => on_error,
+        secs => std::time::Duration::from_secs(secs),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn reset_rate_gate_for_test() {
+    note_success();
 }
 
 /// Cerrojo asíncrono que serializa los refresh de token (patrón SINGLE-FLIGHT).
@@ -568,6 +692,13 @@ pub async fn fetch() -> PlanInfo {
     crate::schema_watch::report("credentials", None); // parseó bien
     let name = plan_label(&creds.subscription_type);
 
+    // Bloqueados por un 429 reciente: no gastamos otra petición (que alargaría el
+    // bloqueo). El poller conserva el último dato bueno mientras tanto.
+    let wait = rate_limited_for();
+    if wait > 0 {
+        return PlanInfo::unavailable(&name, rate_limit_msg(wait));
+    }
+
     let client = http_client();
 
     // Tokens efectivos (caché en memoria o fichero, el más reciente).
@@ -619,12 +750,22 @@ pub async fn fetch() -> PlanInfo {
     if !resp.status().is_success() {
         let code = resp.status().as_u16();
         let msg = match code {
-            429 => "límite de peticiones (reintentando)".to_string(),
+            429 => {
+                let retry_after = resp
+                    .headers()
+                    .get(reqwest::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_owned);
+                let wait = note_rate_limited(retry_after.as_deref());
+                log::warn!("/usage 429: reintento en {wait}s");
+                rate_limit_msg(wait)
+            }
             500..=599 => format!("servidor {code}"),
             _ => format!("HTTP {code}"),
         };
         return PlanInfo::unavailable(&name, msg);
     }
+    note_success();
 
     let body: serde_json::Value = match resp.json().await {
         Ok(j) => j,
@@ -636,6 +777,12 @@ pub async fn fetch() -> PlanInfo {
     // formato del endpoint (no de "sin datos": un 200 siempre trae los límites).
     crate::schema_watch::report("usage_api", usage_drift(&info));
     info
+}
+
+/// Mensaje (corto, se muestra en la UI) de "limitados, reintento en X".
+fn rate_limit_msg(wait_secs: u64) -> String {
+    let mins = wait_secs.div_ceil(60);
+    format!("límite de peticiones (reintento en {mins} min)")
 }
 
 /// Detector PURO de deriva en el blob de credenciales: si el fichero es JSON con
@@ -887,6 +1034,87 @@ mod tests {
 // que van con `#[serial]` y resetean la caché en cada caso.
 // ---------------------------------------------------------------------------
 #[cfg(test)]
+mod window_and_backoff_tests {
+    use super::*;
+    use serial_test::serial;
+
+    #[test]
+    fn clear_expired_windows_purga_solo_lo_caducado() {
+        let past = (chrono::Utc::now() - chrono::Duration::minutes(5)).to_rfc3339();
+        let future = (chrono::Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
+        let mut p = PlanInfo {
+            available: true,
+            session_percent: Some(99.0),
+            session_resets_at: Some(past.clone()),
+            session_severity: Some("critical".into()),
+            weekly_percent: Some(40.0),
+            weekly_resets_at: Some(future.clone()),
+            ..Default::default()
+        };
+        assert!(p.session_window_expired() && !p.weekly_window_expired());
+        assert!(p.clear_expired_windows());
+        assert_eq!((p.session_percent, p.session_resets_at.as_deref()), (None, None));
+        assert!(p.session_severity.is_none());
+        assert_eq!(p.weekly_percent, Some(40.0));
+        // Idempotente: nada más que purgar.
+        assert!(!p.clear_expired_windows());
+        // Reset ausente o ilegible → no se purga por ambigüedad.
+        let mut raro = PlanInfo {
+            session_percent: Some(5.0),
+            session_resets_at: Some("no es fecha".into()),
+            ..Default::default()
+        };
+        assert!(!raro.clear_expired_windows());
+        assert_eq!(raro.session_percent, Some(5.0));
+    }
+
+    #[test]
+    fn backoff_es_exponencial_con_techo() {
+        assert_eq!(backoff_secs(0), 120);
+        assert_eq!(backoff_secs(1), 240);
+        assert_eq!(backoff_secs(2), 480);
+        assert_eq!(backoff_secs(4), 1800);
+        assert_eq!(backoff_secs(60), 1800, "sin desbordar con muchos 429 seguidos");
+    }
+
+    #[test]
+    fn parse_retry_after_segundos_y_fecha_http() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-07-01T10:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        assert_eq!(parse_retry_after("90", now), Some(90));
+        assert_eq!(parse_retry_after(" 0 ", now), Some(1), "acotado a >= 1s");
+        assert_eq!(parse_retry_after("999999", now), Some(3600), "acotado a <= 1h");
+        assert_eq!(parse_retry_after("Wed, 01 Jul 2026 10:05:00 GMT", now), Some(300));
+        assert_eq!(parse_retry_after("mañana", now), None);
+    }
+
+    #[test]
+    #[serial]
+    fn el_limitador_respeta_retry_after_y_se_cierra_al_acertar() {
+        reset_rate_gate_for_test();
+        let normal = std::time::Duration::from_secs(60);
+        let err = std::time::Duration::from_secs(180);
+        assert_eq!(next_poll_delay(true, normal, err), normal);
+        assert_eq!(next_poll_delay(false, normal, err), err);
+
+        let wait = note_rate_limited(Some("600"));
+        assert_eq!(wait, 600);
+        let d = next_poll_delay(false, normal, err).as_secs();
+        assert!((595..=600).contains(&d), "debe esperar lo que pide el servidor: {d}");
+
+        // Sin Retry-After, el segundo 429 seguido dobla la espera base.
+        assert_eq!(note_rate_limited(None), 240);
+        // Un Retry-After ridículo no baja de la base: no martilleamos.
+        assert_eq!(note_rate_limited(Some("1")), 120);
+
+        note_success();
+        assert_eq!(rate_limited_for(), 0);
+        assert_eq!(next_poll_delay(true, normal, err), normal);
+    }
+}
+
+#[cfg(test)]
 mod net_tests {
     use super::*;
     use httpmock::prelude::*;
@@ -921,6 +1149,7 @@ mod net_tests {
             std::env::remove_var(k);
         }
         reset_token_cache_for_test();
+        reset_rate_gate_for_test();
     }
 
     #[tokio::test]
@@ -951,6 +1180,35 @@ mod net_tests {
         assert_eq!(info.session_percent, Some(42.0));
         assert_eq!(info.weekly_percent, Some(12.0));
         assert_eq!(info.source.as_deref(), Some("online"));
+
+        teardown();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn fetch_429_respeta_retry_after_sin_volver_a_llamar() {
+        reset_token_cache_for_test();
+        reset_rate_gate_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        setup_home(tmp.path(), "acc-valid", "ref", now_ms() + 3_600_000);
+
+        let server = MockServer::start_async().await;
+        let limited = server
+            .mock_async(|when, then| {
+                when.method(GET).path("/usage");
+                then.status(429).header("retry-after", "300");
+            })
+            .await;
+        std::env::set_var("QUOTAL_USAGE_URL", server.url("/usage"));
+
+        let first = fetch().await;
+        assert!(!first.available);
+        assert!(first.error.as_deref().unwrap_or("").contains("5 min"), "{:?}", first.error);
+
+        // Dentro de la ventana de espera (p. ej. el botón de refrescar), NO se llama.
+        let second = fetch().await;
+        assert!(!second.available);
+        assert_eq!(limited.hits_async().await, 1, "no debe martillear el endpoint tras un 429");
 
         teardown();
     }

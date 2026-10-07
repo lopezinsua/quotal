@@ -20,7 +20,7 @@ vi.mock("../../src/tauri.js", () => {
   };
 });
 
-const { normAnchor, anchorToTopLeft } = await import("../../src/anchor.js");
+const { normAnchor, anchorToTopLeft, placeInArea } = await import("../../src/anchor.js");
 
 const MON = { position: { x: 0, y: 0 }, size: { width: 1920, height: 1080 } };
 
@@ -63,5 +63,28 @@ describe("anchorToTopLeft", () => {
     // en el origen del monitor.
     const tl = await anchorToTopLeft({ right: false, bottom: false, x: -50, y: -50 }, 248, 268, MON);
     expect(tl).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("placeInArea", () => {
+  // Monitor 1920×1080 con barra de tareas de 48 px abajo (área útil 1920×1032).
+  const WIN = { ...MON, scaleFactor: 1, workArea: { position: { x: 0, y: 0 }, size: { width: 1920, height: 1032 } } };
+  const T = { w: 248, h: 268 };
+
+  it("las posiciones inferiores quedan por ENCIMA de la barra de tareas", () => {
+    expect(placeInArea("right", "bottom", T, WIN)).toEqual({ x: 1920 - 248 - 12, y: 1032 - 268 - 12 });
+    expect(placeInArea("left", "bottom", T, WIN).y + T.h).toBeLessThanOrEqual(1032);
+  });
+
+  it("respeta un área útil desplazada (barra de menús de macOS arriba)", () => {
+    const mac = { ...MON, scaleFactor: 2, workArea: { position: { x: 0, y: 50 }, size: { width: 1920, height: 1030 } } };
+    expect(placeInArea("right", "top", T, mac)).toEqual({ x: 1920 - 496 - 24, y: 50 + 24 });
+  });
+
+  it("sin workArea cae al monitor completo", () => {
+    expect(placeInArea("center", "middle", T, { ...MON, scaleFactor: 1 })).toEqual({
+      x: Math.round((1920 - 248) / 2),
+      y: Math.round((1080 - 268) / 2),
+    });
   });
 });

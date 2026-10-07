@@ -37,11 +37,21 @@ fn statusline_script_path() -> PathBuf {
 /// Busca `claude` en el PATH sin lanzar ningún proceso (cero red, cero shell).
 /// Devuelve la primera ruta encontrada o `None`.
 pub fn detect_claude_binary() -> Option<String> {
+    find_in_path("claude")
+}
+
+/// Busca un ejecutable por nombre en el PATH (con las extensiones de Windows),
+/// sin lanzar ningún proceso. Devuelve la primera ruta encontrada o `None`.
+pub fn find_in_path(bin: &str) -> Option<String> {
     let path_var = std::env::var_os("PATH")?;
-    let candidates = if cfg!(windows) {
-        vec!["claude.exe", "claude.cmd", "claude.bat", "claude"]
+    let candidates: Vec<String> = if cfg!(windows) {
+        ["exe", "cmd", "bat"]
+            .iter()
+            .map(|ext| format!("{bin}.{ext}"))
+            .chain(std::iter::once(bin.to_string()))
+            .collect()
     } else {
-        vec!["claude"]
+        vec![bin.to_string()]
     };
     for dir in std::env::split_paths(&path_var) {
         for name in &candidates {
@@ -58,13 +68,40 @@ pub fn detect_claude_binary() -> Option<String> {
 // 2. Escritura atómica de settings.json + hook statusLine
 // ---------------------------------------------------------------------------
 
-/// Lee `settings.json` como JSON. Si no existe o está corrupto devuelve un
-/// objeto vacío (no es un error: simplemente todavía no hay ajustes).
-fn read_settings() -> Value {
-    match std::fs::read_to_string(paths::settings_path()) {
-        Ok(raw) => serde_json::from_str(&raw).unwrap_or_else(|_| json!({})),
-        Err(_) => json!({}),
+/// Lee `settings.json` como JSON. Si NO existe (o está vacío) devuelve un objeto
+/// vacío: todavía no hay ajustes. Si existe pero no se puede leer o no es un
+/// objeto JSON válido, devuelve `Err`: escribir encima partiendo de `{}` BORRARÍA
+/// toda la configuración del usuario (un error de sintaxis suyo, o una lectura a
+/// medias mientras Claude Code lo reescribe). Ante la duda, no se toca nada.
+fn read_settings() -> Result<Value, String> {
+    let path = paths::settings_path();
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(json!({})),
+        Err(e) => return Err(format!("settings_invalid: no se pudo leer {}: {e}", path.display())),
+    };
+    parse_settings(&raw)
+        .map_err(|e| format!("settings_invalid: {} no es JSON válido ({e})", path.display()))
+}
+
+/// Parseo PURO de `settings.json`: vacío → `{}`; objeto JSON → tal cual; JSON
+/// inválido o raíz no-objeto → `Err` (nunca se "repara" a costa de perder datos).
+fn parse_settings(raw: &str) -> Result<Value, String> {
+    let raw = raw.trim_start_matches('\u{feff}'); // BOM que añaden algunos editores
+    if raw.trim().is_empty() {
+        return Ok(json!({}));
     }
+    match serde_json::from_str::<Value>(raw) {
+        Ok(v) if v.is_object() => Ok(v),
+        Ok(_) => Err("la raíz no es un objeto".into()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Lectura tolerante para las consultas de ESTADO (¿está instalado X?): un
+/// `settings.json` ilegible cuenta simplemente como "no instalado".
+fn read_settings_lenient() -> Value {
+    read_settings().unwrap_or_else(|_| json!({}))
 }
 
 /// Escribe `value` en `path` de forma atómica: primero a `<path>.tmp` y luego
@@ -96,7 +133,7 @@ fn existing_foreign_command(settings: &Value) -> Option<String> {
 
 /// ¿Está ya instalado nuestro puente?
 pub fn is_bridge_installed() -> bool {
-    read_settings()
+    read_settings_lenient()
         .get("statusLine")
         .and_then(|s| s.get("command"))
         .and_then(|c| c.as_str())
@@ -161,7 +198,7 @@ process.stdin.on('end', () => {{\n\
 /// captura el JSON oficial de Claude Code.
 pub fn install_statusline_bridge() -> Result<(), String> {
     paths::ensure_widget_dir().map_err(|e| e.to_string())?;
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
 
     if is_bridge_installed() {
         return Ok(()); // ya está; nada que hacer
@@ -176,21 +213,28 @@ pub fn install_statusline_bridge() -> Result<(), String> {
     let script = write_statusline_script(foreign.as_deref())?;
     let injected = format!("node \"{}\"", script.to_string_lossy());
 
-    if !settings.is_object() {
-        settings = json!({});
-    }
-    settings["statusLine"] = json!({
-        "type": "command",
-        "command": injected,
-    });
+    settings["statusLine"] = bridged_statusline(settings.get("statusLine"), injected);
 
     write_atomic(&paths::settings_path(), &settings)
+}
+
+/// `statusLine` con nuestro comando, CONSERVANDO las demás claves que el usuario
+/// tuviera (p. ej. `padding`): el puente cambia solo QUÉ se ejecuta, no cómo se
+/// presenta. Función PURA.
+fn bridged_statusline(previous: Option<&Value>, command: String) -> Value {
+    let mut sl = match previous {
+        Some(Value::Object(o)) => Value::Object(o.clone()),
+        _ => json!({}),
+    };
+    sl["type"] = json!("command");
+    sl["command"] = Value::String(command);
+    sl
 }
 
 /// Remueve el hook, restaurando el `statusLine` previo desde el backup (o
 /// eliminándolo si no había). También atómico.
 pub fn uninstall_statusline_bridge() -> Result<(), String> {
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
 
     let previous = std::fs::read_to_string(paths::bridge_backup_path())
         .ok()
@@ -402,7 +446,10 @@ fn replace_marked_command(settings: &mut Value, event: &str, marker: &str, new_c
 /// (p. ej. el cierre limpio con `--quit` en vez del viejo `taskkill /F`).
 /// Best-effort: cualquier fallo se ignora (no debe impedir el arranque).
 pub fn resync_installed_hooks() {
-    let mut settings = read_settings();
+    let Ok(mut settings) = read_settings() else {
+        log::warn!("[hooks] settings.json ilegible: no se re-sincronizan los hooks");
+        return;
+    };
     let mut changed = false;
 
     if event_has_marker(&settings, "SessionStart", AUTOSTART_MARKER) {
@@ -454,13 +501,13 @@ fn resync_statusline_script() {
 
 /// ¿Está instalado el auto-arranque con Claude Code?
 pub fn is_autostart_installed() -> bool {
-    event_has_marker(&read_settings(), "SessionStart", AUTOSTART_MARKER)
+    event_has_marker(&read_settings_lenient(), "SessionStart", AUTOSTART_MARKER)
 }
 
 /// Inyecta (idempotente y atómico) un hook `SessionStart` que abre el widget al
 /// iniciar Claude Code. Conserva cualquier otro hook `SessionStart` existente.
 pub fn install_autostart_hook() -> Result<(), String> {
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
 
     // Genera/actualiza el lanzador y obtiene el comando del hook (esto reescribe
     // el VBS con la ruta actual del exe aunque el hook ya existiera).
@@ -477,7 +524,7 @@ pub fn install_autostart_hook() -> Result<(), String> {
 /// Elimina nuestro hook `SessionStart` (deja intactos los demás) y limpia los
 /// contenedores que queden vacíos.
 pub fn uninstall_autostart_hook() -> Result<(), String> {
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
     if !event_has_marker(&settings, "SessionStart", AUTOSTART_MARKER) {
         return Ok(()); // nada que quitar
     }
@@ -577,13 +624,13 @@ fn build_shutdown_command() -> Result<String, String> {
 
 /// Está instalado el auto-cierre con Claude Code?
 pub fn is_shutdown_installed() -> bool {
-    event_has_marker(&read_settings(), "SessionEnd", SHUTDOWN_MARKER)
+    event_has_marker(&read_settings_lenient(), "SessionEnd", SHUTDOWN_MARKER)
 }
 
 /// Inyecta (idempotente y atómico) un hook `SessionEnd` que cierra el widget al
 /// terminar la sesión de Claude Code. Conserva los demás hooks `SessionEnd`.
 pub fn install_shutdown_hook() -> Result<(), String> {
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
 
     // (Re)genera el script de cierre con la ruta actual del exe.
     let command = build_shutdown_command()?;
@@ -599,7 +646,7 @@ pub fn install_shutdown_hook() -> Result<(), String> {
 /// Elimina nuestro hook `SessionEnd` (deja intactos los demás) y limpia los
 /// contenedores vacíos.
 pub fn uninstall_shutdown_hook() -> Result<(), String> {
-    let mut settings = read_settings();
+    let mut settings = read_settings()?;
     if !event_has_marker(&settings, "SessionEnd", SHUTDOWN_MARKER) {
         return Ok(()); // nada que quitar
     }
@@ -885,6 +932,33 @@ mod tests {
         assert!(existing_foreign_command(&json!({ "statusLine": { "command": "  " } })).is_none());
         assert!(existing_foreign_command(&json!({})).is_none());
     }
+
+    #[test]
+    fn parse_settings_rechaza_lo_que_no_es_un_objeto_json() {
+        // Vacío (o solo espacios / BOM) → aún no hay ajustes: `{}`.
+        assert_eq!(parse_settings("").unwrap(), json!({}));
+        assert_eq!(parse_settings("  \n").unwrap(), json!({}));
+        assert_eq!(parse_settings("\u{feff}{\"a\":1}").unwrap(), json!({ "a": 1 }));
+        // Objeto válido → tal cual.
+        assert_eq!(parse_settings("{\"model\":\"opus\"}").unwrap(), json!({ "model": "opus" }));
+        // JSON roto (coma colgante, típico al editar a mano) o raíz no-objeto → Err:
+        // escribir encima borraría la configuración del usuario.
+        assert!(parse_settings("{\"model\":\"opus\",}").is_err());
+        assert!(parse_settings("{\"model\":").is_err());
+        assert!(parse_settings("[]").is_err());
+    }
+
+    #[test]
+    fn bridged_statusline_conserva_las_claves_del_usuario() {
+        let previo = json!({ "type": "command", "command": "starship prompt", "padding": 0 });
+        let sl = bridged_statusline(Some(&previo), "node \"x.cjs\"".into());
+        assert_eq!(sl, json!({ "type": "command", "command": "node \"x.cjs\"", "padding": 0 }));
+        // Sin statusLine previo (o con uno no-objeto) → solo tipo + comando.
+        let sl = bridged_statusline(None, "cmd".into());
+        assert_eq!(sl, json!({ "type": "command", "command": "cmd" }));
+        let sl = bridged_statusline(Some(&json!("raro")), "cmd".into());
+        assert_eq!(sl, json!({ "type": "command", "command": "cmd" }));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,6 +1148,54 @@ mod fs_tests {
         uninstall_shutdown_hook().unwrap();
         assert!(!is_shutdown_installed());
         assert_eq!(read_settings_value(tmp.path()), original, "no se restauró exacto");
+
+        teardown();
+    }
+
+    /// Un `settings.json` con un error de sintaxis NO se puede pisar: instalar o
+    /// desinstalar cualquier hook debe fallar dejando el fichero byte a byte igual
+    /// (antes se leía como `{}` y se sobrescribía, borrando TODA la config).
+    #[test]
+    #[serial]
+    fn settings_corrupto_no_se_sobrescribe_nunca() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let claude = tmp.path().join(".claude");
+        std::fs::create_dir_all(&claude).unwrap();
+        let roto = "{\n  \"model\": \"opus\",\n  \"permissions\": { \"allow\": [\"Bash\"] },\n}\n";
+        std::fs::write(claude.join("settings.json"), roto).unwrap();
+
+        assert!(install_autostart_hook().is_err());
+        assert!(uninstall_autostart_hook().is_err());
+        assert!(install_shutdown_hook().is_err());
+        assert!(uninstall_shutdown_hook().is_err());
+        assert!(install_statusline_bridge().is_err());
+        assert!(uninstall_statusline_bridge().is_err());
+        resync_installed_hooks(); // best-effort: tampoco debe escribir
+                                  // Las consultas de estado toleran el fichero roto (= "no instalado").
+        assert!(!is_autostart_installed() && !is_shutdown_installed() && !is_bridge_installed());
+
+        let after = std::fs::read_to_string(claude.join("settings.json")).unwrap();
+        assert_eq!(after, roto, "settings.json del usuario modificado");
+
+        teardown();
+    }
+
+    #[test]
+    #[serial]
+    fn statusline_bridge_conserva_padding_y_lo_restaura() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let original =
+            json!({ "statusLine": { "type": "command", "command": "ccline", "padding": 0 } });
+        write_settings(tmp.path(), &original);
+
+        install_statusline_bridge().unwrap();
+        let after = read_settings_value(tmp.path());
+        assert_eq!(after["statusLine"]["padding"], 0, "el puente no debe perder `padding`");
+
+        uninstall_statusline_bridge().unwrap();
+        assert_eq!(read_settings_value(tmp.path()), original);
 
         teardown();
     }

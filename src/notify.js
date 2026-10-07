@@ -27,6 +27,20 @@ const tracked = {
 // Hasta ver el primer payload no disparamos (evita avisar en cada arranque).
 let baselineSet = false;
 
+// El `resets_at` del servidor puede variar unos segundos (o microsegundos) entre
+// consultas de la MISMA ventana. Compararlo como texto exacto re-armaba el aviso
+// y podía notificar dos veces en una ventana. Solo es una ventana NUEVA si el
+// reset se movió más que esto (las ventanas reales saltan 5 h / 7 días).
+const WINDOW_JITTER_MS = 10 * 60 * 1000;
+
+function isNewWindow(prev, next) {
+  if (prev == null) return true;
+  const a = Date.parse(prev);
+  const b = Date.parse(next);
+  if (Number.isFinite(a) && Number.isFinite(b)) return Math.abs(b - a) > WINDOW_JITTER_MS;
+  return prev !== next;
+}
+
 /// ¿Hay permiso del SO para notificar? Lo pide si aún no se ha decidido.
 /// Devuelve `true` si quedó concedido. Tolerante: si la API no está, `false`.
 export async function ensureNotifyPermission() {
@@ -69,9 +83,9 @@ function evaluate(kind, percent, windowKey, threshold, bodyKey) {
   const st = tracked[kind];
 
   // Ventana nueva (reseteó): re-arma el aviso.
-  if (windowKey != null && windowKey !== st.windowKey) {
+  if (windowKey != null) {
+    if (isNewWindow(st.windowKey, windowKey)) st.notified = false;
     st.windowKey = windowKey;
-    st.notified = false;
   }
 
   const over = percent >= threshold;

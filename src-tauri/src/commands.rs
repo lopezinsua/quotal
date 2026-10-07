@@ -60,10 +60,12 @@ pub async fn refresh_plan(app: AppHandle, state: State<'_, SharedHandle>) -> Res
 }
 
 /// Error devuelto cuando una acción de ESCRITURA se intenta en modo solo-lectura.
-/// El frontend revierte el toggle y puede mostrarlo.
+/// El frontend revierte el toggle y muestra el motivo. Los errores de los
+/// toggles empiezan por un CÓDIGO estable (`read_only:`, `node_missing:`,
+/// `settings_invalid:`) que la UI traduce; el resto es detalle para el log.
 fn read_only_guard() -> Result<(), String> {
     if crate::app_config::is_read_only() {
-        Err("modo solo-lectura activo: Quotal no modifica settings.json".into())
+        Err("read_only: modo solo-lectura activo, Quotal no modifica settings.json".into())
     } else {
         Ok(())
     }
@@ -118,6 +120,15 @@ pub fn statusline_status() -> bool {
 #[tauri::command]
 pub fn install_statusline_bridge() -> Result<(), String> {
     read_only_guard()?;
+    // El wrapper del puente es un script Node. Con el instalador NATIVO de Claude
+    // Code puede no haber `node` en el PATH: instalarlo igualmente dejaría al
+    // usuario SIN statusline (Claude Code fallaría al lanzar `node …`). Mejor
+    // negarse con un motivo claro que la UI muestra.
+    if claude_code_bridge::find_in_path("node").is_none() {
+        return Err(
+            "node_missing: Node.js no está en el PATH y el puente statusLine lo necesita".into()
+        );
+    }
     claude_code_bridge::install_statusline_bridge()
 }
 
@@ -158,11 +169,31 @@ pub fn hide_to_tray(app: AppHandle) {
 #[tauri::command]
 pub fn set_tray_static(app: AppHandle, state: State<'_, SharedHandle>, enabled: bool) {
     crate::tray::set_tray_static(enabled);
+    redraw_tray(&app, state.inner());
+}
+
+/// Textos traducidos de la bandeja (menú + tooltip). El frontend los envía al
+/// resolver el idioma y al cambiarlo; se aplican al instante.
+#[tauri::command]
+pub fn set_tray_labels(
+    app: AppHandle,
+    state: State<'_, SharedHandle>,
+    labels: crate::tray::TrayLabels,
+) {
+    crate::tray::set_labels(&app, labels);
+    redraw_tray(&app, state.inner());
+}
+
+/// Redibuja icono + tooltip de la bandeja con el plan actual (sin esperar al
+/// próximo sondeo).
+fn redraw_tray(app: &AppHandle, state: &SharedHandle) {
     let (remaining, sev, tooltip) = match state.lock() {
-        Ok(g) => (g.plan.session_remaining(), g.plan.session_status(), g.plan.tray_tooltip()),
+        Ok(g) => {
+            (g.plan.session_remaining(), g.plan.session_status(), crate::tray::tooltip_for(&g.plan))
+        }
         Err(_) => return,
     };
-    crate::tray::set_gauge(&app, remaining, sev, &tooltip);
+    crate::tray::set_gauge(app, remaining, sev, &tooltip);
 }
 
 /// Aplica posición Y tamaño (físicos) JUNTOS para que el cambio de modo
@@ -477,13 +508,23 @@ pub fn scan_system_deps() -> DepsReport {
         ("librsvg", "librsvg-2.so", ["librsvg2-2", "librsvg2", "librsvg"]),
     ];
 
-    // Una sola pasada de `ldconfig -p` lista todas las libs registradas.
-    let listing = std::process::Command::new("ldconfig")
-        .arg("-p")
-        .output()
-        .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
+    // Una sola pasada de `ldconfig -p` lista todas las libs registradas. En Debian
+    // y derivadas `/sbin` NO está en el PATH de un usuario normal: probamos también
+    // las rutas absolutas. Si no hay forma de obtener el listado, NO sabemos qué
+    // falta → informe vacío (antes se daban las tres libs por ausentes: falso aviso).
+    let Some(listing) =
+        ["ldconfig", "/sbin/ldconfig", "/usr/sbin/ldconfig"].iter().find_map(|bin| {
+            std::process::Command::new(bin)
+                .arg("-p")
+                .output()
+                .ok()
+                .filter(|o| o.status.success() && !o.stdout.is_empty())
+                .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        })
+    else {
+        log::warn!("[deps] ldconfig no disponible: no se comprueban dependencias");
+        return DepsReport::default();
+    };
 
     // Gestor de paquetes -> columna de nombres + prefijo del comando.
     let (idx, cmd) = if which("apt-get") {
