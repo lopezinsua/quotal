@@ -13,6 +13,7 @@ export const el = {
   planHead: document.getElementById("plan-head"),
   sessionBlock: document.getElementById("session-block"),
   sessionPct: document.getElementById("session-pct"),
+  sessionEta: document.getElementById("session-eta"),
   sessionFill: document.getElementById("session-fill"),
   sessionSpark: document.getElementById("session-spark"),
   sessionSparkArea: document.getElementById("session-spark-area"),

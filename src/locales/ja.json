@@ -114,5 +114,9 @@
   "tray_session": "セッション",
   "tray_weekly": "週間",
   "tray_offline": "オフライン",
+  "pace_mark": "このウィンドウの {n}% が経過",
+  "eta_h": "約{h}時間{m}分で上限",
+  "eta_m": "約{m}分で上限",
+  "eta_hint": "最近のペースだと、リセット前に上限に達します",
   "_auto": "自動"
 }

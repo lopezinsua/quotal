@@ -114,5 +114,9 @@
   "tray_session": "会话",
   "tray_weekly": "本周",
   "tray_offline": "离线",
+  "pace_mark": "此窗口已过去 {n}%",
+  "eta_h": "约{h}小时{m}分达上限",
+  "eta_m": "约{m}分钟达上限",
+  "eta_hint": "按最近的速度，你会在重置前达到上限",
   "_auto": "自动"
 }
