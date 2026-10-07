@@ -118,5 +118,16 @@
   "eta_h": "约{h}小时{m}分达上限",
   "eta_m": "约{m}分钟达上限",
   "eta_hint": "按最近的速度，你会在重置前达到上限",
+  "upd_whats_new": "新功能",
+  "upd_downloading": "正在下载… {pct}%",
+  "upd_downloading_mb": "正在下载… {mb} MB",
+  "upd_err_net": "无法连接 GitHub。请检查网络后重试。",
+  "upd_err_sig": "更新的签名无效，未安装。",
+  "upd_auto": "自动检查更新",
+  "upd_last": "上次检查：{fresh}",
+  "upd_done": "已更新到 v{v}",
+  "upd_more": "…以及另外 {n} 项更改",
+  "upd_short": "v{v} 可用",
+  "upd_options": "更多选项",
   "_auto": "自动"
 }

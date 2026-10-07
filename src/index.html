@@ -69,16 +69,49 @@
           </div>
         </header>
 
-        <!-- Aviso de ACTUALIZACIÓN disponible: el backend emite update://available
-             al arrancar; la UI lo muestra salvo que el usuario eligiera "No mostrar
-             más" para esa versión. -->
-        <div id="update-banner" class="notice notice-update hidden">
-          <span id="update-text" class="notice-text"></span>
-          <div class="notice-actions">
+        <!-- Aviso de ACTUALIZACIÓN disponible (update://available). COMPACTO: una
+             fila que ocupa el sitio de la cabecera del plan (la tarjeta tiene alto
+             fijo; un aviso alto empujaba fuera la semana y el contexto). El ⌄
+             despliega las novedades y "No mostrar más"; la descarga se ve como una
+             línea de progreso en el borde inferior. -->
+        <div id="update-banner" class="notice notice-update notice-compact hidden">
+          <div class="notice-row">
+            <span id="update-text" class="notice-text" role="status"></span>
             <button id="update-install" class="notice-btn primary" data-i18n="upd_install">Update</button>
-            <button id="update-dismiss" class="notice-btn" data-i18n="upd_dismiss">Dismiss</button>
-            <button id="update-mute" class="notice-btn" data-i18n="upd_mute">Don't show again</button>
+            <button id="update-notes-toggle" class="notice-icon" aria-expanded="false" data-i18n-title="upd_options">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+            <button id="update-dismiss" class="notice-icon" data-i18n-title="upd_dismiss">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+            </button>
           </div>
+          <div id="update-more" class="notice-more hidden">
+            <ul id="update-notes" class="notice-notes hidden"></ul>
+            <button id="update-mute" class="notice-link" data-i18n="upd_mute">Don't show again</button>
+          </div>
+          <!-- Progreso de la descarga (update://progress), sin ocupar alto. -->
+          <div id="update-progress" class="upd-progress hidden" aria-hidden="true">
+            <div id="update-progress-fill" class="upd-progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Tras ACTUALIZAR: "Actualizado a vX" una vez, con sus novedades. Mismo
+             formato compacto; se cierra solo si no se despliega. -->
+        <div id="updated-banner" class="notice notice-update notice-compact hidden">
+          <div class="notice-row">
+            <span id="updated-text" class="notice-text" role="status"></span>
+            <button id="updated-notes-toggle" class="notice-icon hidden" aria-expanded="false" data-i18n-title="upd_whats_new">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+            <button id="updated-dismiss" class="notice-icon" data-i18n-title="upd_dismiss">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          <ul id="updated-notes" class="notice-notes hidden"></ul>
         </div>
 
         <!-- Aviso de DEPENDENCIAS del sistema faltantes (solo Linux). -->
@@ -358,6 +391,10 @@
               <span id="upd-current" class="hint"></span>
               <button id="upd-check" class="border-reset" data-i18n="upd_check">Check for updates</button>
             </div>
+            <label class="setting-row">
+              <span data-i18n="upd_auto">Check for updates automatically</span>
+              <input type="checkbox" id="opt-auto-update" />
+            </label>
             <p id="upd-status" class="hint upd-status"></p>
           </div>
           <p class="settings-note" data-i18n="note"></p>

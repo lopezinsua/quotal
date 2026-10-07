@@ -118,5 +118,16 @@
   "eta_h": "Limite ~{h}h{m}",
   "eta_m": "Limite ~{m} min",
   "eta_hint": "À ce rythme, vous atteindrez la limite avant sa réinitialisation",
+  "upd_whats_new": "Nouveautés",
+  "upd_downloading": "Téléchargement… {pct} %",
+  "upd_downloading_mb": "Téléchargement… {mb} Mo",
+  "upd_err_net": "Impossible de joindre GitHub. Vérifiez votre connexion et réessayez.",
+  "upd_err_sig": "La signature de la mise à jour n'est pas valide ; elle n'a pas été installée.",
+  "upd_auto": "Rechercher les mises à jour automatiquement",
+  "upd_last": "Dernière vérification : {fresh}",
+  "upd_done": "Mis à jour en v{v}",
+  "upd_more": "…et {n} autres changements",
+  "upd_short": "v{v} disponible",
+  "upd_options": "Plus d’options",
   "_auto": "Automatique"
 }

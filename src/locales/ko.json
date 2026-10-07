@@ -118,5 +118,16 @@
   "eta_h": "{h}시간 {m}분 후 한도",
   "eta_m": "{m}분 후 한도",
   "eta_hint": "최근 속도라면 재설정 전에 한도에 도달합니다",
+  "upd_whats_new": "새로운 기능",
+  "upd_downloading": "다운로드 중… {pct}%",
+  "upd_downloading_mb": "다운로드 중… {mb} MB",
+  "upd_err_net": "GitHub에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+  "upd_err_sig": "업데이트 서명이 유효하지 않아 설치하지 않았습니다.",
+  "upd_auto": "업데이트 자동 확인",
+  "upd_last": "마지막 확인: {fresh}",
+  "upd_done": "v{v}(으)로 업데이트됨",
+  "upd_more": "…외 {n}개 변경 사항",
+  "upd_short": "v{v} 사용 가능",
+  "upd_options": "더보기",
   "_auto": "자동"
 }

@@ -150,7 +150,8 @@ Registrados en `lib.rs`; implementados en `commands.rs`.
 | `set_tray_static` / `set_tray_labels` / `hide_to_tray` | `()` | Bandeja (color fijo, textos traducidos que envía el front, ocultar). |
 | `primary_button_down` | `bool` | ¿Botón primario pulsado? (fin de arrastre fiable, Windows). |
 | `set_bounds` / `animate_bounds` | `Result<()>` | Geometría de la ventana. |
-| `update_check` / `update_install` | `UpdateStatus` / `Result<()>` | Auto-actualización. |
+| `update_check` / `update_install` | `UpdateStatus` / `Result<()>` | Comprobar (manual) / descargar con progreso, instalar y reiniciar (`updates.rs`). |
+| `update_prefs` / `set_auto_update_check` | objeto / `()` | Comprobación automática on/off y última comprobación. |
 | `check_system_deps` | objeto | Libs nativas que faltan (Linux). |
 
 Los `install_*` rechazan en modo solo-lectura.
@@ -166,7 +167,8 @@ statusLine necesita Node.js en el PATH) y `settings_invalid:`. Este último prot
 | Evento | Payload | Cuándo |
 |--------|---------|--------|
 | `usage://metrics-updated` | `MetricsPayload` | Cada consolidación de contexto o plan. |
-| `update://available` | `UpdateStatus` | Al arrancar, si hay versión nueva. |
+| `update://available` | `UpdateStatus` | Al arrancar y cada 6 h (si la comprobación automática está activa), si hay versión nueva. Incluye las notas. |
+| `update://progress` | `{phase, downloaded, total}` | Durante la descarga (`download`) y al empezar la instalación (`install`). |
 | `window://visibility-changed` | `{visible}` | Al ocultar el widget a la bandeja. |
 | `app://will-quit` | — | Antes de un cierre limpio. |
 
@@ -187,3 +189,4 @@ statusLine necesita Node.js en el PATH) y `settings_invalid:`. Este último prot
 | `paths.rs` | Rutas (Claude Code + widget). |
 | `tray.rs` | Icono/menú de bandeja y su tooltip (textos traducidos). |
 | `commands.rs` | Comandos IPC. |
+| `updates.rs` | Actualizaciones: comprobación periódica, instalación con progreso. |
