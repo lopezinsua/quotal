@@ -620,6 +620,8 @@ matcher = "*"
         teardown();
     }
 
+    // El lanzador `.vbs` solo existe en Windows (en Unix el hook es un comando sh).
+    #[cfg(windows)]
     #[test]
     #[serial]
     fn resync_regenera_el_script_sin_tocar_el_toml_en_windows() {
