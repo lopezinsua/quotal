@@ -114,5 +114,9 @@
   "tray_session": "Session",
   "tray_weekly": "Semaine",
   "tray_offline": "hors ligne",
+  "pace_mark": "{n} % de cette fenêtre est écoulé",
+  "eta_h": "Limite ~{h}h{m}",
+  "eta_m": "Limite ~{m} min",
+  "eta_hint": "À ce rythme, vous atteindrez la limite avant sa réinitialisation",
   "_auto": "Automatique"
 }

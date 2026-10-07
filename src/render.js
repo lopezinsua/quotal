@@ -5,9 +5,11 @@ import { el, SOURCE_CLASSES, SEVERITY_CLASSES } from "./dom.js";
 import { ui } from "./state.js";
 import { prefs } from "./prefs.js";
 import { t } from "./i18n.js";
-import { pushSample, series } from "./history.js";
+import { pushSample, series, timedSamples } from "./history.js";
+import { windowElapsed, limitEta, SESSION_WINDOW_MS, WEEKLY_WINDOW_MS } from "./pace.js";
 import {
   worstSeverity,
+  fmtEta,
   fmtWindow,
   fmtTokens,
   fmtResetIn,
@@ -104,6 +106,56 @@ export function renderUsagePct(fillEl, pctEl, percent, severity) {
   return pct;
 }
 
+// Marca de RITMO: una muesca en la pista en el punto de la ventana que ya ha
+// transcurrido. Si la barra la adelanta, se está gastando más rápido de lo que
+// aguanta la ventana (clase `over`). Se crea bajo demanda dentro de la pista, así
+// sirve para cualquier barra (Claude o Kimi) sin tocar el HTML.
+function renderPace(fillEl, resetsAt, windowMs, percent) {
+  const track = fillEl && fillEl.parentElement;
+  if (!track) return;
+  let mark = track.querySelector(".pace-mark");
+  const frac = percent == null || !resetsAt ? null : windowElapsed(resetsAt, windowMs);
+  if (frac == null) {
+    if (mark) mark.classList.add("hidden");
+    track.removeAttribute("title");
+    return;
+  }
+  if (!mark) {
+    mark = document.createElement("span");
+    mark.className = "pace-mark";
+    mark.setAttribute("aria-hidden", "true");
+    track.appendChild(mark);
+  }
+  const at = frac * 100;
+  mark.classList.remove("hidden");
+  mark.style.left = `${at.toFixed(1)}%`;
+  mark.classList.toggle("over", percent > at + 2);
+  track.title = t("pace_mark", { n: Math.round(at) });
+}
+
+// Proyección de la sesión: si al ritmo reciente se llegaría al 100 % ANTES del
+// reinicio, lo dice junto al % ("Límite ~1h 20m"). Si no, no ocupa sitio.
+// Va después de pintar el reinicio: si junto al % no cabe (idiomas con un "%
+// usado" largo, como el ruso), ocupa el hueco del reinicio, que pasa al tooltip.
+function renderEta(plan, sessPct, enabled) {
+  if (!el.sessionEta) return;
+  const eta =
+    enabled && sessPct != null
+      ? limitEta(timedSamples(), plan.session_resets_at, SESSION_WINDOW_MS)
+      : null;
+  const text = eta == null ? "" : fmtEta(eta);
+  el.sessionEta.textContent = text;
+  el.sessionEta.classList.toggle("hidden", eta == null);
+  el.sessionReset.classList.remove("eta");
+  el.sessionReset.removeAttribute("title");
+  if (eta != null && el.sessionEta.scrollWidth > el.sessionEta.clientWidth + 1) {
+    el.sessionEta.classList.add("hidden");
+    el.sessionReset.title = el.sessionReset.textContent;
+    el.sessionReset.textContent = text;
+    el.sessionReset.classList.add("eta");
+  }
+}
+
 export function render(p) {
   ui.lastPayload = p;
   const m = p.active;
@@ -142,10 +194,17 @@ export function render(p) {
     ? fmtResetIn(plan.session_resets_at)
     : t("reset_dash");
 
-  renderUsagePct(el.weeklyFill, el.weeklyPct, plan.weekly_percent, plan.weekly_severity);
+  const weekPct = renderUsagePct(
+    el.weeklyFill,
+    el.weeklyPct,
+    plan.weekly_percent,
+    plan.weekly_severity,
+  );
   el.weeklyReset.textContent = plan.weekly_resets_at
     ? fmtResetAt(plan.weekly_resets_at)
     : t("reset_dash");
+  renderPace(el.sessionFill, plan.session_resets_at, SESSION_WINDOW_MS, sessPct);
+  renderPace(el.weeklyFill, plan.weekly_resets_at, WEEKLY_WINDOW_MS, weekPct);
 
   // ---- Kimi (uso de Kimi Code, espejo de las ventanas del plan de Claude) ----
   // Visibilidad según la vista de proveedor:
@@ -168,10 +227,12 @@ export function render(p) {
       ? fmtResetIn(kimi.session_resets_at)
       : t("reset_dash");
 
-    renderUsagePct(el.kimiWeeklyFill, el.kimiWeeklyPct, kimi.weekly_percent, kimi.weekly_severity);
+    const kimiWeekPct = renderUsagePct(el.kimiWeeklyFill, el.kimiWeeklyPct, kimi.weekly_percent, kimi.weekly_severity);
     el.kimiWeeklyReset.textContent = kimi.weekly_resets_at
       ? fmtResetAt(kimi.weekly_resets_at)
       : t("reset_dash");
+    renderPace(el.kimiSessionFill, kimi.session_resets_at, SESSION_WINDOW_MS, kimiSessPct);
+    renderPace(el.kimiWeeklyFill, kimi.weekly_resets_at, WEEKLY_WINDOW_MS, kimiWeekPct);
   }
 
   // Aviso visual del widget según la peor severidad. La clase también conmuta el
@@ -187,6 +248,7 @@ export function render(p) {
   const fresh = pushSample(plan.session_percent, plan.fetched_at);
   renderSparkline(series());
   if (fresh && sessPct != null) flash(el.sessionPct);
+  renderEta(plan, sessPct, showClaude);
 
   // Píldora: los tres estilos se alimentan del MISMO % de sesión y heredan el
   // color de estado vía `--state`. En modo "solo Kimi" el % es el de la ventana

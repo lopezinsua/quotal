@@ -43,6 +43,15 @@ export function fmtResetIn(iso) {
   return h >= 1 ? t("reset_in_h", { h, m }) : t("reset_in_m", { m: Math.max(1, m) });
 }
 
+// Tiempo hasta el límite (proyección): "Limit in ~1h 20m" (traducido). Redondea
+// hacia ARRIBA a minutos: decir "~0m" o quedarse corto sería alarmismo inútil.
+export function fmtEta(ms) {
+  const mins = Math.max(1, Math.ceil(ms / 6e4));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h >= 1 ? t("eta_h", { h, m }) : t("eta_m", { m });
+}
+
 // Fecha absoluta corta, con día/hora formateados según el idioma (Intl).
 export function fmtResetAt(iso) {
   if (!iso) return t("reset_dash");

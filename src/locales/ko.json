@@ -114,5 +114,9 @@
   "tray_session": "세션",
   "tray_weekly": "주간",
   "tray_offline": "오프라인",
+  "pace_mark": "이 기간의 {n}%가 지났습니다",
+  "eta_h": "{h}시간 {m}분 후 한도",
+  "eta_m": "{m}분 후 한도",
+  "eta_hint": "최근 속도라면 재설정 전에 한도에 도달합니다",
   "_auto": "자동"
 }

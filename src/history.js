@@ -40,3 +40,10 @@ export function pushSample(percent, stamp) {
 
 // Valores en orden cronológico (0..100).
 export const series = () => samples.map((s) => s.v);
+
+// Muestras con su instante en ms ({t, v}), para calcular el ritmo de consumo. La
+// marca es el `fetched_at` del backend (ISO) o, sin él, un `Date.now()` en texto.
+export const timedSamples = () =>
+  samples
+    .map((s) => ({ t: /^\d+$/.test(s.t) ? Number(s.t) : Date.parse(s.t), v: s.v }))
+    .filter((s) => Number.isFinite(s.t));

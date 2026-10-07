@@ -114,5 +114,9 @@
   "tray_session": "Sessão",
   "tray_weekly": "Semana",
   "tray_offline": "offline",
+  "pace_mark": "{n}% desta janela já passou",
+  "eta_h": "Limite ~{h}h{m}",
+  "eta_m": "Limite ~{m}min",
+  "eta_hint": "No ritmo recente você atinge o limite antes de ele reiniciar",
   "_auto": "Automático"
 }

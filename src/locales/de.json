@@ -114,5 +114,9 @@
   "tray_session": "Sitzung",
   "tray_weekly": "Woche",
   "tray_offline": "offline",
+  "pace_mark": "{n} % dieses Zeitfensters sind vergangen",
+  "eta_h": "Limit ~{h}h {m}min",
+  "eta_m": "Limit ~{m} Min.",
+  "eta_hint": "Beim aktuellen Tempo erreichst du das Limit vor dem Reset",
   "_auto": "Automatisch"
 }

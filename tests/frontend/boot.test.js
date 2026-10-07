@@ -113,6 +113,13 @@ beforeAll(async () => {
     notification: {},
   };
   localStorage.clear();
+  // Historial de la sesión subiendo ~1 %/min durante media hora: con el 37 % actual
+  // y el reinicio dentro de 2 h, la proyección debe avisar del límite (~1 h).
+  const hist = Array.from({ length: 31 }, (_, i) => ({
+    t: new Date(Date.now() - (31 - i) * 60_000).toISOString(),
+    v: 6 + i,
+  }));
+  localStorage.setItem("widget-usage-history", JSON.stringify(hist));
   await import("../../src/main.js");
   // El arranque es una cadena de promesas (prefs → layout → posición → show):
   // esperamos a su ÚLTIMO paso en vez de contar ticks, que varía entre versiones.
@@ -129,6 +136,19 @@ describe("arranque completo del frontend", () => {
     expect(document.getElementById("session-pct").textContent).toBe("37% used");
     expect(document.getElementById("weekly-pct").textContent).toBe("12% used");
     expect(document.getElementById("context-label").textContent).toBe("Context · 200k");
+  });
+
+  it("marca el ritmo en las barras y proyecta el límite de la sesión", () => {
+    const sessMark = document.querySelector("#session-block .pace-mark");
+    const weekMark = document.querySelector("#weekly-block .pace-mark");
+    expect(sessMark).not.toBeNull();
+    expect(weekMark).not.toBeNull();
+    // Sesión de 5 h que se reinicia dentro de 2 h → han pasado 3 h (60 %).
+    expect(parseFloat(sessMark.style.left)).toBeCloseTo(60, 0);
+    expect(sessMark.classList.contains("over")).toBe(false); // 37 % < 60 %
+    const eta = document.getElementById("session-eta");
+    expect(eta.classList.contains("hidden")).toBe(false);
+    expect(eta.textContent).toMatch(/^Limit ~1h \d+m$/);
   });
 
   it("se suscribe a las actualizaciones del backend y repinta", async () => {

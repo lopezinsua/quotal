@@ -13,8 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   picks Claude, Kimi or both, and "Open/Close with Kimi Code" install reversible
   `SessionStart`/`SessionEnd` hooks in `~/.kimi-code/config.toml` (edited in
   place, preserving your comments and formatting).
+- **Pace marker on every usage bar.** A thin tick shows how much of the window
+  has elapsed: if the bar is past it, you're spending faster than the window can
+  sustain (the tick brightens). Hover the bar for the exact figure.
+- **"Limit in ~X" projection.** When your recent session pace (last hour) would
+  hit 100% *before* the window resets, the widget says so next to the
+  percentage, e.g. "Limit ~28m". It stays out of the way otherwise; in languages
+  where it doesn't fit next to the number it takes the reset slot, and the
+  reset time moves to the tooltip.
 
 ### Fixed
+- With a non-English language, the first numbers ("72% used", "Resets in…")
+  appeared in English until the next refresh; they're now translated right away.
+- The statusLine bridge writes its capture atomically and skips empty input, so
+  Quotal never reads a half-written (empty) capture.
 - **Never overwrites a broken `settings.json`.** If Claude Code's `settings.json`
   can't be parsed (a stray trailing comma, or a read while Claude Code was
   rewriting it), installing or removing any hook used to start from `{}` and

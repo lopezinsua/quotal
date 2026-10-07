@@ -377,6 +377,37 @@ body {
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
+/* Fila del % héroe + proyección al límite (a la derecha, solo si aplica). El
+   margen que antes llevaba el % pasa a la fila. */
+.hero .pct-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 9px;
+}
+.hero .pct-row .usage-pct { margin: 0; }
+.pace-eta {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--state-warn);
+  font-variant-numeric: tabular-nums;
+}
+/* Sin sitio junto al %: la proyección ocupa el hueco del reinicio. */
+.hero .usage-reset.eta {
+  font-weight: 600;
+  color: var(--state-warn);
+}
+/* El ámbar de aviso apenas contrasta sobre el fondo claro: versión oscura. */
+.card.theme-light .pace-eta,
+.card.theme-light .hero .usage-reset.eta { color: #a3620a; }
+
 /* Pulso de color (una sola vez) cuando llega un valor nuevo. */
 .usage-pct.flash { animation: val-flash 0.7s ease; }
 @keyframes val-flash {
@@ -433,6 +464,22 @@ body {
 .progress-fill.weekly { --fill: var(--weekly-ok); }
 .progress-fill.warn { --fill: var(--state-warn); --fill-glow: 7px; }
 .progress-fill.crit { --fill: var(--state-crit); --fill-glow: 9px; }
+
+/* Marca de RITMO: cuánto de la ventana ha transcurrido. Discreta por defecto;
+   más visible cuando el uso la adelanta (se gasta más rápido de lo sostenible). */
+.pace-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--fg);
+  opacity: 0.35;
+  pointer-events: none;
+  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.pace-mark.over { opacity: 0.85; }
 
 /* Esqueleto de carga: una sola pasada de luz sobre las pistas vacías. */
 .card.loading .progress-track::after {
