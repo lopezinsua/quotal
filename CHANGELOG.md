@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strings that were still in English in 9 languages are now translated. A test
   keeps every language in sync with the English source.
 
+### Security
+- Updated dependencies with published advisories: `rustls` 0.23.45 and `h2`
+  0.4.20 (used by the updater's HTTPS), `byte-unit` 5.2.6 (drops the vulnerable
+  `rkyv` 0.7), and the build/test toolchain (`vitest`, `postcss`, `nanoid`,
+  `brace-expansion`). `cargo audit` and `npm audit` are clean again.
+
 ## [0.3.4] — 2026-07-10
 
 ### Fixed
