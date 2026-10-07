@@ -252,7 +252,7 @@ pub fn uninstall_statusline_bridge() -> Result<(), String> {
     match previous {
         Some(Value::Null) | None => {
             if let Some(obj) = settings.as_object_mut() {
-                obj.remove("statusLine");
+                obj.shift_remove("statusLine");
             }
         }
         Some(prev) => {
@@ -393,12 +393,12 @@ fn remove_marked_group(settings: &mut Value, event: &str, marker: &str) {
         let empty =
             hooks.get(event).and_then(|s| s.as_array()).map(|a| a.is_empty()).unwrap_or(false);
         if empty {
-            hooks.remove(event);
+            hooks.shift_remove(event);
         }
     }
     if settings.get("hooks").and_then(|h| h.as_object()).map(|h| h.is_empty()).unwrap_or(false) {
         if let Some(obj) = settings.as_object_mut() {
-            obj.remove("hooks");
+            obj.shift_remove("hooks");
         }
     }
 }
@@ -1243,6 +1243,62 @@ mod fs_tests {
 
         run("   ");
         assert_eq!(std::fs::read_to_string(&cap).unwrap(), json, "vacío no pisa la captura");
+
+        teardown();
+    }
+
+    /// Activar y desactivar los tres toggles deja el settings.json del usuario
+    /// IDÉNTICO como TEXTO, incluido el orden de sus claves (no alfabético). Antes
+    /// serde_json las reordenaba alfabéticamente en cada escritura.
+    #[test]
+    #[serial]
+    fn los_toggles_conservan_el_texto_exacto_del_settings() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let claude = tmp.path().join(".claude");
+        std::fs::create_dir_all(&claude).unwrap();
+        let original = r#"{
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "padding": 0,
+    "command": "ccline"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo ajeno"
+          }
+        ]
+      }
+    ]
+  },
+  "alwaysThinkingEnabled": true,
+  "permissions": {
+    "deny": [],
+    "allow": [
+      "Bash"
+    ]
+  }
+}"#;
+        let path = claude.join("settings.json");
+        std::fs::write(&path, original).unwrap();
+
+        install_autostart_hook().unwrap();
+        install_shutdown_hook().unwrap();
+        install_statusline_bridge().unwrap();
+        let during = std::fs::read_to_string(&path).unwrap();
+        let first_keys: Vec<&str> =
+            during.lines().filter(|l| l.starts_with("  \"")).map(|l| l.trim()).collect();
+        assert!(first_keys[0].starts_with("\"model\""), "orden alterado: {first_keys:?}");
+
+        uninstall_statusline_bridge().unwrap();
+        uninstall_shutdown_hook().unwrap();
+        uninstall_autostart_hook().unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
 
         teardown();
     }
