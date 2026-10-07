@@ -70,7 +70,11 @@ const MON = {
 };
 
 const win = {
-  show: vi.fn(() => Promise.resolve()),
+  shown: 0,
+  show() {
+    this.shown++;
+    return Promise.resolve();
+  },
   setAlwaysOnTop: () => Promise.resolve(),
   setMinSize: () => Promise.resolve(),
   setMaxSize: () => Promise.resolve(),
@@ -110,12 +114,15 @@ beforeAll(async () => {
   };
   localStorage.clear();
   await import("../../src/main.js");
-  for (let i = 0; i < 10; i++) await flush();
+  // El arranque es una cadena de promesas (prefs → layout → posición → show):
+  // esperamos a su ÚLTIMO paso en vez de contar ticks, que varía entre versiones.
+  await vi.waitFor(() => expect(win.shown).toBeGreaterThan(0), { timeout: 3000 });
+  await flush();
 });
 
 describe("arranque completo del frontend", () => {
   it("revela la ventana (nace oculta) y pinta el primer payload", () => {
-    expect(win.show).toHaveBeenCalled();
+    expect(win.shown).toBeGreaterThan(0);
     const card = document.getElementById("card");
     expect(card.classList.contains("loading")).toBe(false);
     expect(document.getElementById("plan-name").textContent).toBe("Max");

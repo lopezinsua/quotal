@@ -10,7 +10,7 @@ points. The broader technical plan lives in [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Prerequisites
 
-- [Rust](https://rustup.rs) (stable) and [Node.js](https://nodejs.org) 20+.
+- [Rust](https://rustup.rs) (stable) and [Node.js](https://nodejs.org) 22.12+.
 - On **Linux**, the WebKitGTK / app-indicator dev packages:
 
   ```bash

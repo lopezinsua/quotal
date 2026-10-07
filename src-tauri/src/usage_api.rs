@@ -1208,7 +1208,7 @@ mod net_tests {
         // Dentro de la ventana de espera (p. ej. el botón de refrescar), NO se llama.
         let second = fetch().await;
         assert!(!second.available);
-        assert_eq!(limited.hits_async().await, 1, "no debe martillear el endpoint tras un 429");
+        assert_eq!(limited.calls_async().await, 1, "no debe martillear el endpoint tras un 429");
 
         teardown();
     }

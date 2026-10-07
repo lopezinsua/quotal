@@ -88,9 +88,9 @@ jobs:
           workspaces: "./src-tauri -> target"
 
       - name: Configurar Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Instalar dependencias del proyecto
         run: npm install

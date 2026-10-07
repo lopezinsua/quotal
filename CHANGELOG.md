@@ -54,6 +54,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rkyv` 0.7), and the build/test toolchain (`vitest`, `postcss`, `nanoid`,
   `brace-expansion`). `cargo audit` and `npm audit` are clean again.
 
+### Dependencies
+- Tauri 2.12 and its plugins (store, single-instance, log, updater,
+  notification), `windows` 0.62 (now the same version Tauri uses), `reqwest`
+  0.13 (shared with the updater: one HTTP stack instead of two, 566 crates
+  instead of 623), `notify` 8, `tokio` 1.53; tests on `httpmock` 0.8 and
+  `serial_test` 4. Supersedes the pending Dependabot PRs.
+- Frontend tooling: Vitest 5, jsdom 30, ESLint 10.12. Building from source now
+  needs **Node.js 22.12+** (Node 20 is end-of-life); CI and releases run on
+  Node 24 and `actions/setup-node` v7.
+
 ## [0.3.4] — 2026-07-10
 
 ### Fixed
