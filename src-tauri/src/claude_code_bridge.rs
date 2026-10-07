@@ -169,7 +169,15 @@ process.stdin.on('data', (c) => (data += c));\n\
 process.stdin.on('end', () => {{\n\
   // Captura para el widget: ASÍNCRONA y best-effort, para no retrasar el statusline\n\
   // (Node drena la cola de eventos antes de salir, así que igualmente se escribe).\n\
-  fs.writeFile(CAPTURE, data, () => {{}});\n\
+  // ATÓMICA (tmp + rename): escribir directamente trunca el fichero y, si el widget\n\
+  // lo lee en ese instante, ve una captura vacía. Una entrada vacía no se escribe.\n\
+  if (data.trim()) {{\n\
+    const tmp = CAPTURE + '.tmp';\n\
+    fs.writeFile(tmp, data, (err) => {{\n\
+      if (err) return;\n\
+      fs.rename(tmp, CAPTURE, (e) => {{ if (e) fs.writeFile(CAPTURE, data, () => {{}}); }});\n\
+    }});\n\
+  }}\n\
   if (!ORIG) return;\n\
   // Reenvía al statusline original propagando stdout, stderr Y código de salida.\n\
   try {{\n\
@@ -1196,6 +1204,45 @@ mod fs_tests {
 
         uninstall_statusline_bridge().unwrap();
         assert_eq!(read_settings_value(tmp.path()), original);
+
+        teardown();
+    }
+
+    /// Ejecuta el wrapper generado con `node` (si está disponible): la captura se
+    /// escribe completa y de forma atómica (sin `.tmp` residual), una entrada vacía
+    /// NO pisa la captura anterior y la salida del statusline original se reenvía.
+    #[test]
+    #[serial]
+    fn el_wrapper_captura_de_forma_atomica_y_reenvia() {
+        if find_in_path("node").is_none() {
+            eprintln!("node no disponible: se omite");
+            return;
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        set_home(tmp.path());
+        let script =
+            write_statusline_script(Some("node -e \"process.stdout.write('ORIG-OK')\"")).unwrap();
+        let run = |input: &str| {
+            use std::io::Write;
+            let mut child = std::process::Command::new("node")
+                .arg(&script)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+            child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+            let out = child.wait_with_output().unwrap();
+            String::from_utf8_lossy(&out.stdout).into_owned()
+        };
+
+        let json = r#"{"version":"2.1.200","context_window":{"total_input_tokens":1}}"#;
+        assert_eq!(run(json), "ORIG-OK", "debe reenviar la salida del statusline original");
+        let cap = paths::capture_path();
+        assert_eq!(std::fs::read_to_string(&cap).unwrap(), json);
+        assert!(!cap.with_extension("json.tmp").exists(), "no debe quedar el temporal");
+
+        run("   ");
+        assert_eq!(std::fs::read_to_string(&cap).unwrap(), json, "vacío no pisa la captura");
 
         teardown();
     }

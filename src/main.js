@@ -22,8 +22,14 @@ import { flushPrefs } from "./prefs.js";
 import { notifyFromPayload } from "./notify.js";
 import "./update.js"; // avisos de actualización y de dependencias (efectos al importar)
 
-// Al resolver la tabla del idioma activo, traduce las cadenas estáticas del HTML.
-i18nReady.then(() => applyStaticI18n());
+// Al resolver la tabla del idioma activo, traduce las cadenas estáticas del HTML
+// y REPINTA el último dato: el primer render suele llegar antes que la tabla (es
+// una carga asíncrona) y sus textos ("72% usado", "Se restablece en…") se
+// quedaban en inglés hasta el siguiente refresco.
+i18nReady.then(() => {
+  applyStaticI18n();
+  if (ui.lastPayload) render(ui.lastPayload);
+});
 
 // ---- Persistir el último ajuste al ocultar/cerrar ----
 // Los guardados con debounce (tamaño tras redimensionar, ancla tras reacomodo)
