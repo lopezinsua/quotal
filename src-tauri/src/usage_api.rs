@@ -968,6 +968,18 @@ mod tests {
     }
 
     #[test]
+    fn merge_tokens_conserva_el_orden_de_las_claves() {
+        // Orden real de Claude Code (no alfabético) + una clave de nivel superior
+        // antes de claudeAiOauth: reescribir el token no debe reordenar nada.
+        let raw = r#"{"mcpOAuth":{},"claudeAiOauth":{"accessToken":"a","refreshToken":"r","expiresAt":1,"refreshTokenExpiresAt":2,"scopes":["x"],"subscriptionType":"max","rateLimitTier":"t"}}"#;
+        let out = merge_tokens_into_blob(raw, "A2", "R2", 99).unwrap();
+        assert_eq!(
+            out,
+            r#"{"mcpOAuth":{},"claudeAiOauth":{"accessToken":"A2","refreshToken":"R2","expiresAt":99,"refreshTokenExpiresAt":2,"scopes":["x"],"subscriptionType":"max","rateLimitTier":"t"}}"#
+        );
+    }
+
+    #[test]
     fn merge_tokens_rechaza_blob_sin_claudeaioauth() {
         // Si el fichero no tiene la forma esperada, devolvemos None (no escribimos).
         assert!(merge_tokens_into_blob(r#"{"x":1}"#, "a", "b", 1).is_none());

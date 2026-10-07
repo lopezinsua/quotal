@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     session instead of coming back with the next check.
 
 ### Fixed
+- **Your files keep their key order.** Writing `settings.json` (hooks) or
+  `.credentials.json` (token refresh) re-sorted their keys alphabetically. Quotal
+  now preserves the original order, so turning a toggle off really restores the
+  file text exactly as it was.
 - With a non-English language, the first numbers ("72% used", "Resets in…")
   appeared in English until the next refresh; they're now translated right away.
 - The statusLine bridge writes its capture atomically and skips empty input, so
