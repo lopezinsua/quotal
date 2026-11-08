@@ -35,7 +35,7 @@ reqwest = { version = "0.13", features = ["json", "form"] }
 # Edición TOML que PRESERVA comentarios y formato: el `config.toml` de Kimi Code
 # es del usuario (lleva su api_key y sus secciones), así que los hooks se inyectan
 # de forma quirúrgica, nunca re-serializando con un parser que pierda el formato.
-toml_edit = "0.22"
+toml_edit = "0.25"
 
 # Solo Windows: SetWindowPos para aplicar posición + tamaño en UNA operación
 # atómica del SO (cambio de modo píldora↔completo perfectamente fluido, sin frame
@@ -59,7 +59,7 @@ windows = { version = "0.62", features = [
 # a `.credentials.json` en un directorio temporal; `serial_test` serializa los
 # tests que tocan variables de entorno globales (HOME / QUOTAL_*_URL).
 [dev-dependencies]
-httpmock = "0.8"
+httpmock = "0.9"
 tempfile = "3"
 serial_test = "4"
 
